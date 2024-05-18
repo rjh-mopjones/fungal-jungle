@@ -1,9 +1,10 @@
 use rand::prelude::SliceRandom;
+use rand::SeedableRng;
 
-// The permutation table is used to shuffle the gradient vectors.
-fn generate_permutation_table() -> [usize; 512] {
+// The permutation table is used to shuffle the gradient vectors based on a seed
+fn generate_permutation_table(seed: u64) -> [usize; 512] {
     let mut p: Vec<usize> = (0..256).collect();
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
     p.shuffle(&mut rng);
 
     let mut perm = [0; 512];
@@ -52,17 +53,29 @@ fn perlin_noise(x: f64, y: f64, perm: &[usize; 512]) -> f64 {
     linear_interpolation(v, x1, x2)
 }
 
-pub fn generate(width: usize, height: usize, scale: f64) -> Vec<Vec<f64>> {
-    let perm = generate_permutation_table();
+pub fn generate(width: u32, height: u32, scale: f64, seed: u64, octaves: usize, frequency: f64, amplitude: f64, shift: f64) -> Vec<Vec<f64>> {
+    let perm = generate_permutation_table(seed);
 
-    let mut noise_map = vec![vec![0.0; width]; height];
+    let mut noise_map = vec![vec![0.0; width as usize]; height as usize];
 
     for y in 0..height {
         for x in 0..width {
-            let nx = x as f64 * scale;
-            let ny = y as f64 * scale;
-            noise_map[y][x] = perlin_noise(nx, ny, &perm);
+            let mut noise_value = 0.0;
+            let mut freq = frequency;
+            let mut amp = amplitude;
+
+            for _ in 0..octaves {
+                let nx = x as f64 * scale * freq;
+                let ny = y as f64 * scale * freq;
+                noise_value += perlin_noise(nx, ny, &perm) * amp;
+
+                freq *= 2.0;
+                amp *= 0.5;
+            }
+
+            noise_map[y as usize][x as usize] = noise_value-shift;
         }
     }
-    return noise_map;
+
+    noise_map
 }
