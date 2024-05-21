@@ -34,7 +34,7 @@ fn fade(t: f64) -> f64 {
     t * t * t * (t * (t * 6.0 - 15.0) + 10.0)
 }
 
-// Combine all the components to generate Perlin noise.
+// Combine all the components to generate Perlin noise_wrapper.
 fn perlin_noise(x: f64, y: f64, perm: &[usize; 512]) -> f64 {
     let xi = x.floor() as usize & 255;
     let yi = y.floor() as usize & 255;

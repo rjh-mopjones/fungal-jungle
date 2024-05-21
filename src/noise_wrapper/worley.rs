@@ -55,7 +55,7 @@ pub fn generate(height: usize, width: usize, num_points: usize, num_relaxations:
         }
     }
 
-    // Compute noise map
+    // Compute noise_wrapper map
     let mut noise_map = vec![vec![0.0; width]; height];
     for i in 0..height {
         for j in 0..width {
@@ -67,7 +67,7 @@ pub fn generate(height: usize, width: usize, num_points: usize, num_relaxations:
             noise_map[i][j] = distances[1]; // Use distance to the second closest point
         }
     }
-    // Normalize noise map
+    // Normalize noise_wrapper map
     let mut min_value = f64::MAX;
     let mut max_value = f64::MIN;
     for i in 0..height {
@@ -84,7 +84,7 @@ pub fn generate(height: usize, width: usize, num_points: usize, num_relaxations:
         }
     }
 
-    // Invert noise map
+    // Invert noise_wrapper map
     for i in 0..height {
         for j in 0..width {
             noise_map[i][j] = 1.0 - noise_map[i][j];
