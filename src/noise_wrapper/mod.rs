@@ -1,3 +1,2 @@
-pub mod perlin;
-pub mod worley;
 pub mod tidal;
+mod scale_on_axis;

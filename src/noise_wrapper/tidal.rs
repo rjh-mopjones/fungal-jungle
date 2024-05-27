@@ -1,5 +1,6 @@
-use noise::{Add, Cache, Clamp, Curve, Fbm, Min, MultiFractal, Perlin, RidgedMulti, ScaleBias, Seedable, Turbulence};
+use noise::{Add, Cache, Clamp, Curve, Fbm, Min, MultiFractal, Perlin, RidgedMulti, ScaleBias, ScalePoint, Seedable, Turbulence};
 use noise::utils::{NoiseMap, NoiseMapBuilder, PlaneMapBuilder};
+use crate::noise_wrapper::scale_on_axis::ScaleOnAxis;
 
 pub fn generate_tidal_noise(width: usize, height: usize, seed: u32) -> NoiseMap {
 
@@ -16,6 +17,7 @@ pub fn generate_tidal_noise(width: usize, height: usize, seed: u32) -> NoiseMap 
         .set_persistence(0.5)
         .set_lacunarity(CONTINENT_LACUNARITY)
         .set_octaves(8);
+
     let baseContinentDef_cu = Curve::new(baseContinentDef_fb0)
         .add_control_point(-2.0000 + SEA_LEVEL, -1.625 + SEA_LEVEL)
         .add_control_point(-1.0000 + SEA_LEVEL, -1.375 + SEA_LEVEL)
@@ -27,16 +29,21 @@ pub fn generate_tidal_noise(width: usize, height: usize, seed: u32) -> NoiseMap 
         .add_control_point(0.7500 + SEA_LEVEL, 0.250 + SEA_LEVEL)
         .add_control_point(1.0000 + SEA_LEVEL, 0.500 + SEA_LEVEL)
         .add_control_point(2.0000 + SEA_LEVEL, 0.500 + SEA_LEVEL);
+
     let baseContinentDef_fb1 = Fbm::<Perlin>::new(seed + 1)
         .set_frequency(CONTINENT_FREQUENCY * 4.34375)
         .set_persistence(0.5)
         .set_lacunarity(CONTINENT_LACUNARITY)
         .set_octaves(24);
+
     let baseContinentDef_sb = ScaleBias::new(baseContinentDef_fb1)
         .set_scale(0.5)
         .set_bias(0.1);
+
     let baseContinentDef_mi = Min::new(baseContinentDef_sb, baseContinentDef_cu);
+
     let baseContinentDef_cl = Clamp::new(baseContinentDef_mi).set_bounds(-1.0, 1.0);
+
     let baseContinentDef = Cache::new(baseContinentDef_cl);
 
     let riverPositions_rm0 = RidgedMulti::<Perlin>::new(seed + 100)
@@ -81,16 +88,18 @@ pub fn generate_tidal_noise(width: usize, height: usize, seed: u32) -> NoiseMap 
 
     let continentsWithRivers_ad = Add::new(&baseContinentDef, continentsWithRivers_sb);
 
+    let scaled_conts= ScalePoint::new(&continentsWithRivers_ad).set_z_scale(1.5);
     use std::time::Instant;
 
     let now = Instant::now();
 
-    let noise_map = PlaneMapBuilder::new(&continentsWithRivers_ad)
-        .set_size(width, height)
-        .set_x_bounds(-1.0, 1.0)
-        .set_y_bounds(-1.0, 1.0)
-        .build();
+    let tidalLock = ScaleOnAxis::new(&scaled_conts).set_y_scale(1.5);
 
+    let noise_map = PlaneMapBuilder::new(&tidalLock)
+        .set_size(width, height)
+        .set_x_bounds(0.0, 2.0)
+        .set_y_bounds(0.0, 2.0)
+        .build();
 
     let elapsed = now.elapsed();
 
