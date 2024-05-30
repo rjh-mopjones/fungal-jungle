@@ -2,12 +2,13 @@ use noise::{Add, Cache, Clamp, Curve, Fbm, Min, MultiFractal, Perlin, RidgedMult
 use noise::utils::{ColorGradient, ImageRenderer, NoiseMapBuilder, PlaneMapBuilder};
 
 pub mod io;
-pub mod noise_wrapper;
+pub mod jungle_noise;
+mod macro_map;
 
 fn main() {
 
 
-    let noise_map = noise_wrapper::tidal::generate_tidal_noise(1024, 512, 1995);
+    let noise_map = jungle_noise::tidal::generate_tidal_noise(1024, 512, 1995);
 
     io::image::write_image_to_file(
         &ImageRenderer::new()

@@ -1,6 +1,32 @@
 use noise::{Add, Cache, Clamp, Curve, Fbm, Min, MultiFractal, Perlin, RidgedMulti, ScaleBias, ScalePoint, Seedable, Turbulence};
 use noise::utils::{NoiseMap, NoiseMapBuilder, PlaneMapBuilder};
-use crate::noise_wrapper::scale_on_axis::ScaleOnAxis;
+use crate::macro_map::macro_map::{MacroMap, MacroMapTile, Tile};
+
+pub fn generate_in_house_tidal_noise(width: usize, height: usize, seed: u32) -> MacroMap {
+    const CONTINENT_FREQUENCY: f64 = 2.0;
+    const CONTINENT_LACUNARITY: f64 = 2.208984375;
+    const SEA_LEVEL: f64 = 0.0;
+    const RIVER_DEPTH: f64 = 0.0234375;
+
+    // Do fbm perlin for base continent def
+    // Do curve with controlpoints for sea level
+    // Do another fbm perlin for base continent def fb1 that carves out mountain range chunks
+    // scale this output
+    // take the min of the sea level curves and the mountain range chunks
+    // clamp this so the bounds are -1.0 to 1.0
+    // cache this
+
+    let macro_map = MacroMap {
+        size: (1024, 512),
+        border_value: 0.0,
+        map: vec! [MacroMapTile {
+            tile: Tile::Blank,
+            temperature: 0.0,
+            height: 0.0
+        }]
+    };
+    return macro_map;
+}
 
 pub fn generate_tidal_noise(width: usize, height: usize, seed: u32) -> NoiseMap {
 
@@ -46,56 +72,13 @@ pub fn generate_tidal_noise(width: usize, height: usize, seed: u32) -> NoiseMap 
 
     let baseContinentDef = Cache::new(baseContinentDef_cl);
 
-    let riverPositions_rm0 = RidgedMulti::<Perlin>::new(seed + 100)
-        .set_frequency(18.75)
-        .set_lacunarity(CONTINENT_LACUNARITY)
-        .set_octaves(1);
-
-    let riverPositions_cu0 = Curve::new(riverPositions_rm0)
-        .add_control_point(-2.000, 2.000)
-        .add_control_point(-1.000, 1.000)
-        .add_control_point(-0.125, 0.875)
-        .add_control_point(0.000, -1.000)
-        .add_control_point(1.000, -1.500)
-        .add_control_point(2.000, -2.000);
-
-    let riverPositions_rm1 = RidgedMulti::<Perlin>::new(seed + 101)
-        .set_frequency(43.25)
-        .set_lacunarity(CONTINENT_LACUNARITY)
-        .set_octaves(1);
-
-    let riverPositions_cu1 = Curve::new(riverPositions_rm1)
-        .add_control_point(-2.000, 2.0000)
-        .add_control_point(-1.000, 1.5000)
-        .add_control_point(-0.125, 1.4375)
-        .add_control_point(0.000, 0.5000)
-        .add_control_point(1.000, 0.2500)
-        .add_control_point(2.000, 0.0000);
-
-    let riverPositions_mi = Min::new(riverPositions_cu0, riverPositions_cu1);
-
-    let riverPositions_tu = Turbulence::<_, Perlin>::new(riverPositions_mi)
-        .set_seed(seed + 102)
-        .set_frequency(9.25)
-        .set_power(1.0 / 57.75)
-        .set_roughness(6);
-
-    let riverPositions = Cache::new(riverPositions_tu);
-
-    let continentsWithRivers_sb = ScaleBias::new(riverPositions)
-        .set_scale(RIVER_DEPTH / 2.0)
-        .set_bias(-RIVER_DEPTH / 2.0);
-
-    let continentsWithRivers_ad = Add::new(&baseContinentDef, continentsWithRivers_sb);
-
-    let scaled_conts= ScalePoint::new(&continentsWithRivers_ad).set_z_scale(1.5);
     use std::time::Instant;
 
     let now = Instant::now();
 
-    let tidalLock = ScaleOnAxis::new(&scaled_conts).set_y_scale(1.5);
+    // let tidalLock = ScaleOnAxis::new(&scaled_conts).set_y_scale(1.5);
 
-    let noise_map = PlaneMapBuilder::new(&tidalLock)
+    let noise_map = PlaneMapBuilder::new(&baseContinentDef)
         .set_size(width, height)
         .set_x_bounds(0.0, 2.0)
         .set_y_bounds(0.0, 2.0)
