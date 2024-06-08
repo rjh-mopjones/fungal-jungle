@@ -10,7 +10,7 @@ fn main() {
 
     let noise_map = jungle_noise::tidal::generate_tidal_noise(1024, 512, 1995);
 
-    io::image::write_image_to_file(
+    io::image_utils::write_image_to_file(
         &ImageRenderer::new()
             .set_gradient(ColorGradient::new().build_terrain_gradient())
             .render(&noise_map),

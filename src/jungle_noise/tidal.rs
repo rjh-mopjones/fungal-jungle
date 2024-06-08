@@ -1,6 +1,11 @@
+use std::fmt::Debug;
 use noise::{Add, Cache, Clamp, Curve, Fbm, Min, MultiFractal, Perlin, RidgedMulti, ScaleBias, ScalePoint, Seedable, Turbulence};
 use noise::utils::{NoiseMap, NoiseMapBuilder, PlaneMapBuilder};
-use crate::macro_map::macro_map::{MacroMap, MacroMapTile, Tile};
+use crate::jungle_noise::generator::{Generator, Generator3D};
+use crate::jungle_noise::source::Source;
+use crate::macro_map::macro_map::{generate_macro_map, MacroMap, MacroMapTile, Tile};
+
+
 
 pub fn generate_in_house_tidal_noise(width: usize, height: usize, seed: u32) -> MacroMap {
     const CONTINENT_FREQUENCY: f64 = 2.0;
@@ -9,23 +14,16 @@ pub fn generate_in_house_tidal_noise(width: usize, height: usize, seed: u32) -> 
     const RIVER_DEPTH: f64 = 0.0234375;
 
     // Do fbm perlin for base continent def
-    // Do curve with controlpoints for sea level
+    let generator = Source::<2>::perlin(42).fbm(8, CONTINENT_FREQUENCY, CONTINENT_LACUNARITY, 0.5);
+    return generate_macro_map(width, height, &generator);
+
+    // Do curve with control points for sea level
     // Do another fbm perlin for base continent def fb1 that carves out mountain range chunks
     // scale this output
     // take the min of the sea level curves and the mountain range chunks
     // clamp this so the bounds are -1.0 to 1.0
     // cache this
 
-    let macro_map = MacroMap {
-        size: (1024, 512),
-        border_value: 0.0,
-        map: vec! [MacroMapTile {
-            tile: Tile::Blank,
-            temperature: 0.0,
-            height: 0.0
-        }]
-    };
-    return macro_map;
 }
 
 pub fn generate_tidal_noise(width: usize, height: usize, seed: u32) -> NoiseMap {
