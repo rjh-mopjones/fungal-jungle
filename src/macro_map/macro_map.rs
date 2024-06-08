@@ -26,6 +26,7 @@ pub struct MacroMap {
 }
 
 pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<2>>(width: usize, height:usize, generator: &G) -> MacroMap {
+
     let blank_tile = MacroMapTile {
         tile: Tile::Blank,
         temperature: 0.0,
@@ -39,16 +40,15 @@ pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<2>>(width
     };
     for y in 0..height {
         for x in 0..width {
-            let mut fx: f64 = x as f64;
-            let mut fy: f64 = y as f64;
-            let mut output: f64 = generator.sample([fx, fy]);
+            let mut output: f64 = generator.sample([x as f64, y as f64]);
 
             if output < 0.0 {
-                macro_map.map[x][y].tile = Sea
+                macro_map.map[x][y].tile = Sea;
+                macro_map.map[x][y].temperature = ((y/height) as f64 * 150.0) - 50.0;
             } else {
-                macro_map.map[x][y].tile = Plains
+                macro_map.map[x][y].tile = Plains;
+                macro_map.map[x][y].temperature = ((y/height) as f64 * 150.0) - 50.0;
             }
-
         }
     }
 
