@@ -12,7 +12,7 @@ pub fn generate_in_house_tidal_noise(width: usize, height: usize, seed: u32) -> 
     const CONTINENT_LACUNARITY: f64 = 1.70;
 
     // Do fbm perlin for base continent def
-    let generator = Source::<2>::improved_perlin(1995).scale([0.012; 2])
+    let generator = Source::<3>::improved_perlin(1995).scale([0.012; 3])
         .fbm(8, CONTINENT_FREQUENCY, CONTINENT_LACUNARITY, 0.5);
     return generate_macro_map(width, height, &generator);
 
