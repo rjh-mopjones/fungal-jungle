@@ -8,7 +8,7 @@ use crate::macro_map::macro_map::{generate_macro_map, MacroMap, MacroMapTile, Ti
 
 
 pub fn generate_in_house_tidal_noise(width: usize, height: usize, seed: u32) -> MacroMap {
-    const CONTINENT_FREQUENCY: f64 = 2.0;
+    const CONTINENT_FREQUENCY: f64 = 3.0;
     const CONTINENT_LACUNARITY: f64 = 2.208984375;
     const SEA_LEVEL: f64 = 0.0;
     const RIVER_DEPTH: f64 = 0.0234375;
