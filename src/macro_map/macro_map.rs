@@ -42,8 +42,8 @@ pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<2>>(width
         border_value: 0.0,
         map: vec![vec![blank_tile; height]; width]
     };
-    for y in 0..height {
-        for x in 0..width {
+    for y in 0..height{
+        for x in 0..width{
             let mut output: f64 = generator.sample([x as f64, y as f64]);
 
             if output < 0.0 {
@@ -65,12 +65,12 @@ pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<2>>(width
 
 pub fn write_macro_map_to_file(macro_map: MacroMap, filename: &str) {
     let (width, height) = macro_map.size;
-    let mut result = Vec::with_capacity(width * height);
+    let mut result = Vec::with_capacity(height * width);
 
-    for i in &macro_map.map {
-        for j in i.iter() {
-            for k in j.colour {
-                result.push(k);
+    for y in 0..height {
+        for x in 0..width {
+            for z in macro_map.map[x][y].colour{
+                result.push(z);
             }
         }
     }
