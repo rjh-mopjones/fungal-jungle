@@ -18,7 +18,7 @@ impl Tile{
             Tile::Sea =>[0,191,255,255] ,
             Tile::Plains => [50, 205, 50, 255],
             Tile::Ice => [255, 255, 255, 255],
-            Tile::Snow => [250,235,215, 255],
+            Tile::Snow => [211,211,211, 255],
             Tile::Forest=> [0, 100, 0, 255],
             Tile::Desert=> [255,215,0, 255],
             Tile::Sahara=> [255,165,0, 255],
@@ -56,25 +56,24 @@ pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<3>>(width
     for y in 0..height{
         for x in 0..width{
             let mut sample: f64 = generator.sample([x as f64, y as f64, 1.0]);
-            let mut temp_sample: f64 = generator.sample([x as f64, y as f64, 1.1]);
-
-            let mut temperature: f64 = (( y as f64 / height as f64) * 100.0) - 50.0 * temp_sample;
+            let mut temperature: f64 = ((( y as f64 / height as f64) * 150.0) - 50.0)
+                + 100.0 * generator.sample([x as f64, y as f64, 1.1]);
             if y != 0 {
-                println!("temp: {}", temperature);
+                println!("tempSample: {}", temperature);
             }
 
             if sample < 0.0 {
-                if temperature < -5.0{
+                if temperature < -15.0 {
                     macro_map.map[x][y].tile = Tile::Ice;
-                } else if temperature > 60.0 {
+                } else if temperature > 60.0 && sample < 60.0 {
                     macro_map.map[x][y].tile = Tile::Desert;
                 } else {
                     macro_map.map[x][y].tile = Tile::Sea;
                 }
             } else {
-                if temperature < -5.0 {
+                if temperature < 3.0 {
                     macro_map.map[x][y].tile = Tile::Snow;
-                } else if temperature < 10.0 {
+                } else if temperature < 25.0 {
                     macro_map.map[x][y].tile = Tile::Forest;
                 } else if temperature > 60.0 {
                     macro_map.map[x][y].tile = Tile::Sahara;
