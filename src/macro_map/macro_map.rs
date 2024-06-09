@@ -9,7 +9,9 @@ pub enum Tile {
     Forest,
     Plains,
     Desert,
+    Plateau,
     Sahara,
+    Beach,
     Blank,
 }
 impl Tile{
@@ -22,6 +24,9 @@ impl Tile{
             Tile::Forest=> [0, 100, 0, 255],
             Tile::Desert=> [255,215,0, 255],
             Tile::Sahara=> [255,165,0, 255],
+            Tile::Mountain=> [105,105,105, 255],
+            Tile::Plateau=> [139,69,19, 255],
+            Tile::Beach=> [222,184,135, 255],
             _ => {[0,0,0,255]}
         }
     }
@@ -59,26 +64,50 @@ pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<3>>(width
             let mut temperature: f64 = ((( y as f64 / height as f64) * 150.0) - 50.0)
                 + 100.0 * generator.sample([x as f64, y as f64, 1.1]);
             if y != 0 {
-                println!("tempSample: {}", temperature);
+                println!("sample: {}", sample);
             }
 
             if sample < 0.0 {
                 if temperature < -15.0 {
                     macro_map.map[x][y].tile = Tile::Ice;
-                } else if temperature > 60.0 && sample < 60.0 {
+                } else if temperature > 50.0 {
                     macro_map.map[x][y].tile = Tile::Desert;
                 } else {
                     macro_map.map[x][y].tile = Tile::Sea;
                 }
-            } else {
+            } else if sample < 0.02 {
+                if temperature > 3.0 {
+                    macro_map.map[x][y].tile = Tile::Beach;
+                } else {
+                    macro_map.map[x][y].tile = Tile::Snow;
+                }
+            } else if sample < 0.1 {
                 if temperature < 3.0 {
                     macro_map.map[x][y].tile = Tile::Snow;
-                } else if temperature < 25.0 {
-                    macro_map.map[x][y].tile = Tile::Forest;
                 } else if temperature > 60.0 {
                     macro_map.map[x][y].tile = Tile::Sahara;
                 } else {
                     macro_map.map[x][y].tile = Tile::Plains;
+                }
+            } else if sample < 0.2 {
+                if temperature < 3.0 {
+                    macro_map.map[x][y].tile = Tile::Snow;
+                } else if temperature > 60.0 {
+                    macro_map.map[x][y].tile = Tile::Sahara;
+                } else {
+                    macro_map.map[x][y].tile = Tile::Forest;
+                }
+            } else if sample < 0.3 {
+                if temperature > 70.0 {
+                    macro_map.map[x][y].tile = Tile::Plateau;
+                } else {
+                    macro_map.map[x][y].tile = Tile::Mountain;
+                }
+            } else {
+                if temperature < 70.0 {
+                    macro_map.map[x][y].tile = Tile::Snow;
+                } else {
+                    macro_map.map[x][y].tile = Tile::Plateau;
                 }
             }
             macro_map.map[x][y].temperature = temperature;

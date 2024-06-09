@@ -8,8 +8,8 @@ use crate::macro_map::macro_map::{generate_macro_map, MacroMap};
 
 
 pub fn generate_in_house_tidal_noise(width: usize, height: usize, seed: u32) -> MacroMap {
-    const CONTINENT_FREQUENCY: f64 = 0.9;
-    const CONTINENT_LACUNARITY: f64 = 1.70;
+    const CONTINENT_FREQUENCY: f64 = 1.2;
+    const CONTINENT_LACUNARITY: f64 = 1.90;
 
     // Do fbm perlin for base continent def
     let generator = Source::<3>::improved_perlin(1995).scale([0.012; 3])
