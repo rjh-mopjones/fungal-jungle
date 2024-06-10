@@ -8,15 +8,21 @@ use crate::macro_map::macro_map::{generate_macro_map, MacroMap};
 
 
 pub fn generate_in_house_tidal_noise(width: usize, height: usize, seed: u32) -> MacroMap {
-    const CONTINENT_FREQUENCY: f64 = 1.2;
-    const CONTINENT_LACUNARITY: f64 = 1.90;
+    const CONTINENT_FREQUENCY: f64 = 0.75;
+    const CONTINENT_LACUNARITY: f64 = 2.00;
 
     // Do fbm perlin for base continent def
-    let generator = Source::<3>::improved_perlin(1995).scale([0.012; 3])
-        .fbm(8, CONTINENT_FREQUENCY, CONTINENT_LACUNARITY, 0.5);
-    return generate_macro_map(width, height, &generator);
+    let generator = Source::<3>::improved_perlin(42).scale([0.01; 3])
+        .fbm(16, CONTINENT_FREQUENCY, CONTINENT_LACUNARITY, 0.6);
+
+
+    let x_bounds = (0.0, 512.0);
+    let y_bounds = (0.0, 256.0);
+
+    return generate_macro_map(width, height, x_bounds, y_bounds, &generator);
 
     // Do curve with control points for sea level
+
     // Do another fbm perlin for base continent def fb1 that carves out mountain range chunks
     // scale this output
     // take the min of the sea level curves and the mountain range chunks

@@ -45,7 +45,7 @@ pub struct MacroMap {
     pub(crate) map: Vec<Vec<MacroMapTile>>
 }
 
-pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<3>>(width: usize, height:usize, generator: &G) -> MacroMap {
+pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<3>>(width: usize, height:usize, x_bounds: (f64, f64), y_bounds: (f64, f64), generator: &G) -> MacroMap {
 
     let blank_tile = MacroMapTile {
         tile: Tile::Blank,
@@ -58,11 +58,21 @@ pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<3>>(width
         border_value: 0.0,
         map: vec![vec![blank_tile; height]; width]
     };
+
+    let x_extent = x_bounds.1 - x_bounds.0;
+    let y_extent = y_bounds.1 - y_bounds.0;
+
+    let x_step = x_extent / width as f64;
+    let y_step = y_extent / height as f64;
+
+
     for y in 0..height{
+        let current_y = y_bounds.0 + y_step * y as f64;
         for x in 0..width{
-            let mut sample: f64 = generator.sample([x as f64, y as f64, 1.0]);
-            let mut temperature: f64 = ((( y as f64 / height as f64) * 150.0) - 50.0)
-                + 100.0 * generator.sample([x as f64, y as f64, 1.1]);
+            let current_x = x_bounds.0 + x_step * x as f64;
+            let mut sample: f64 = generator.sample([current_x, current_y, 1.0]);
+            let mut temperature: f64 = ((( current_y / height as f64) * 150.0) - 50.0)
+                + 100.0 * generator.sample([current_x, current_y, 1.1]);
             if y != 0 {
                 println!("sample: {}", sample);
             }
