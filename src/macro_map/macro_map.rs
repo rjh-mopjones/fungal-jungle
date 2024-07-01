@@ -1,3 +1,6 @@
+use rayon::iter::plumbing::{bridge, Consumer, Producer, ProducerCallback, UnindexedConsumer};
+use rayon::prelude::*;
+
 pub type Color = [u8; 4];
 #[derive(Copy,Clone)]
 pub enum Tile {
@@ -36,16 +39,109 @@ pub struct MacroMapTile {
     pub(crate) tile: Tile,
     pub(crate) temperature: f64,
     pub(crate) height: f64,
+}
 
+#[derive(Clone)]
+pub struct MacroMapLine{
+    pub(crate) map: Vec<MacroMapTile>
 }
 
 pub struct MacroMap {
     pub(crate) size: (usize, usize),
     pub(crate) border_value: f64,
-    pub(crate) map: Vec<Vec<MacroMapTile>>
+    pub(crate) map: Vec<MacroMapLine>
 }
 
-pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<3>>(width: usize, height:usize, x_bounds: (f64, f64), y_bounds: (f64, f64), generator: &G) -> MacroMap {
+pub struct ParDataIter<'a> {
+    data_slice: &'a [MacroMapLine]
+}
+struct DataProducer<'a> {
+    data_slice : &'a [MacroMapLine],
+}
+
+impl<'a> ParallelIterator for ParDataIter<'a> {
+    type Item = &'a MacroMapLine;
+
+    fn drive_unindexed<C>(self, consumer: C) -> C::Result
+    where
+        C: UnindexedConsumer<Self::Item> {
+        bridge(self,consumer)
+    }
+
+    fn opt_len(&self) -> Option<usize> {
+        Some(self.len())
+    }}
+
+impl<'a> IndexedParallelIterator for ParDataIter<'a> {
+    fn len(&self) -> usize {
+        self.data_slice.len()
+    }
+
+    fn drive<C: Consumer<Self::Item>>(self, consumer: C) -> C::Result {
+        bridge(self,consumer)
+    }
+
+    fn with_producer<CB: ProducerCallback<Self::Item>>(
+        self,
+        callback: CB,
+    ) -> CB::Output {
+        let producer = DataProducer::from(self);
+        callback.callback(producer)
+    }
+}
+
+impl<'a> Producer for DataProducer<'a> {
+    type Item = &'a MacroMapLine;
+    type IntoIter = std::slice::Iter<'a, MacroMapLine>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.data_slice.iter()
+    }
+
+    fn split_at(self, index: usize) -> (Self, Self) {
+        let (left, right) = self.data_slice.split_at(index);
+        (
+            DataProducer { data_slice: left },
+            DataProducer { data_slice: right },
+        )
+    }
+}
+
+impl<'a> From<ParDataIter<'a>> for DataProducer<'a> {
+    fn from(iterator: ParDataIter<'a>) -> Self {
+        Self {
+            data_slice: iterator.data_slice,
+        }
+    }
+}
+impl MacroMap {
+    pub fn parallel_iterator(&self) -> ParDataIter {
+        ParDataIter {
+            data_slice : &self.map,
+        }
+    }
+}
+
+impl<'a> IntoParallelIterator for &'a MacroMap{
+    type Iter = ParDataIter<'a>;
+    type Item = &'a MacroMapLine;
+
+    fn into_par_iter(self) -> Self::Iter {
+        ParDataIter { data_slice: &self.map}
+    }
+}
+
+pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<3> + Sync>(sea_level: f64, width: usize,
+                                                                           height:usize, zoom: f64,
+                                                                           centre: (f64, f64), generator: &G) -> MacroMap {
+    let x_origin = centre.0 * width as f64;
+    let y_origin = centre.1 * height as f64;
+
+    let x_extent = (width as f64 - (x_origin))/zoom;
+    let y_extent = (height as f64 - (y_origin))/zoom;
+
+    let x_step = x_extent / width as f64;
+    let y_step = y_extent / height as f64;
 
     let blank_tile = MacroMapTile {
         tile: Tile::Blank,
@@ -53,79 +149,89 @@ pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<3>>(width
         height: 0.0,
     };
 
+    let blank_line = MacroMapLine{
+        map: vec![blank_tile; width]
+    };
+
     let mut macro_map = MacroMap {
         size: (width, height),
         border_value: 0.0,
-        map: vec![vec![blank_tile; height]; width]
+        map: vec![blank_line.clone(); height]
     };
 
-    let x_extent = x_bounds.1 - x_bounds.0;
-    let y_extent = y_bounds.1 - y_bounds.0;
-
-    let x_step = x_extent / width as f64;
-    let y_step = y_extent / height as f64;
-
-
-    for y in 0..height{
-        let current_y = y_bounds.0 + y_step * y as f64;
-        for x in 0..width{
-            let current_x = x_bounds.0 + x_step * x as f64;
-            let mut sample: f64 = generator.sample([current_x, current_y, 1.0]);
-            let mut temperature: f64 = ((( current_y / height as f64) * 150.0) - 50.0)
-                + 100.0 * generator.sample([current_x, current_y, 1.1]);
-            if y != 0 {
-                println!("sample: {}", sample);
-            }
-
-            if sample < 0.0 {
-                if temperature < -15.0 {
-                    macro_map.map[x][y].tile = Tile::Ice;
-                } else if temperature > 50.0 {
-                    macro_map.map[x][y].tile = Tile::Desert;
-                } else {
-                    macro_map.map[x][y].tile = Tile::Sea;
-                }
-            } else if sample < 0.02 {
-                if temperature > 3.0 {
-                    macro_map.map[x][y].tile = Tile::Beach;
-                } else {
-                    macro_map.map[x][y].tile = Tile::Snow;
-                }
-            } else if sample < 0.1 {
-                if temperature < 3.0 {
-                    macro_map.map[x][y].tile = Tile::Snow;
-                } else if temperature > 60.0 {
-                    macro_map.map[x][y].tile = Tile::Sahara;
-                } else {
-                    macro_map.map[x][y].tile = Tile::Plains;
-                }
-            } else if sample < 0.2 {
-                if temperature < 3.0 {
-                    macro_map.map[x][y].tile = Tile::Snow;
-                } else if temperature > 60.0 {
-                    macro_map.map[x][y].tile = Tile::Sahara;
-                } else {
-                    macro_map.map[x][y].tile = Tile::Forest;
-                }
-            } else if sample < 0.3 {
-                if temperature > 70.0 {
-                    macro_map.map[x][y].tile = Tile::Plateau;
-                } else {
-                    macro_map.map[x][y].tile = Tile::Mountain;
-                }
-            } else {
-                if temperature < 70.0 {
-                    macro_map.map[x][y].tile = Tile::Snow;
-                } else {
-                    macro_map.map[x][y].tile = Tile::Plateau;
+    let results = macro_map.map
+        .par_iter()
+        .enumerate()
+        .map(|(y, line)| {
+            let current_y = y_origin + y_step * y as f64;
+            let mut new_line = MacroMapLine {
+                map: vec![blank_tile; width]
+            };
+            for x in 0..width {
+                let current_x = x_origin + x_step * x as f64;
+                let mut sample: f64 = generator.sample([current_x, current_y, 1.0]);
+                let mut m_temperature: f64 = (((current_y / height as f64) * 150.0) - 50.0)
+                    + 100.0 * generator.sample([current_x, current_y, 1.1]);
+                new_line.map[x] = MacroMapTile {
+                    tile: create_tile(sea_level, sample, m_temperature),
+                    temperature: m_temperature,
+                    height: sample,
                 }
             }
-            macro_map.map[x][y].temperature = temperature;
-            macro_map.map[x][y].height = sample;
+            return new_line;
+        }).collect();
+
+    MacroMap {
+        size: (width, height),
+        border_value: 0.0,
+        map: results
+    }
+}
+
+fn create_tile(sea_level: f64, sample: f64, temperature: f64) -> Tile {
+    if sample < sea_level {
+        if temperature < -15.0 {
+            return Tile::Ice;
+        } else if temperature > 50.0 {
+            return Tile::Desert;
+        } else {
+            return Tile::Sea;
+        }
+    } else if sample < sea_level + 0.02 {
+        if temperature > 3.0 {
+            return Tile::Beach;
+        } else {
+            return Tile::Snow;
+        }
+    } else if sample < sea_level + 0.1 {
+        if temperature < 3.0 {
+            return Tile::Snow;
+        } else if temperature > 60.0 {
+            return Tile::Sahara;
+        } else {
+            return Tile::Plains;
+        }
+    } else if sample < sea_level + 0.2 {
+        if temperature < 3.0 {
+            return Tile::Snow;
+        } else if temperature > 60.0 {
+            return Tile::Sahara;
+        } else {
+            return Tile::Forest;
+        }
+    } else if sample < sea_level + 0.3 {
+        if temperature > 70.0 {
+            return Tile::Plateau;
+        } else {
+            return Tile::Mountain;
+        }
+    } else {
+        if temperature < 70.0 {
+            return Tile::Snow;
+        } else {
+            return Tile::Plateau;
         }
     }
-
-    return macro_map;
 }
 
 pub fn write_macro_map_to_file(macro_map: MacroMap, filename: &str) {
@@ -134,7 +240,7 @@ pub fn write_macro_map_to_file(macro_map: MacroMap, filename: &str) {
 
     for y in 0..height {
         for x in 0..width {
-            for z in macro_map.map[x][y].tile.colour(){
+            for z in macro_map.map[y].map[x].tile.colour(){
                 result.push(z);
             }
         }
