@@ -7,13 +7,13 @@ use crate::macro_map::macro_map::{generate_macro_map, MacroMap};
 
 
 
-pub fn generate_in_house_tidal_noise(width: usize, height: usize, seed: u32) -> MacroMap {
+pub fn generate_in_house_tidal_noise(width: usize, height: usize, seed: u64) -> MacroMap {
     const CONTINENT_FREQUENCY: f64 = 0.75;
     const CONTINENT_LACUNARITY: f64 = 2.00;
     const SEA_LEVEL: f64 = 0.015;
 
     // Do fbm perlin for base continent def
-    let generator = Source::<3>::improved_perlin(42).scale([0.01; 3])
+    let generator = Source::<3>::improved_perlin(seed).scale([0.01; 3])
         .fbm(16, CONTINENT_FREQUENCY, CONTINENT_LACUNARITY, 0.6);
 
     // zoom 256 for player map

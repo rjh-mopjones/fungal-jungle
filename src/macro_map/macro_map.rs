@@ -189,47 +189,47 @@ pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<3> + Sync
 }
 
 fn create_tile(sea_level: f64, sample: f64, temperature: f64) -> Tile {
-    if sample < sea_level {
+    return if sample < sea_level {
         if temperature < -15.0 {
-            return Tile::Ice;
+            Tile::Ice
         } else if temperature > 50.0 {
-            return Tile::Desert;
+            Tile::Desert
         } else {
-            return Tile::Sea;
+            Tile::Sea
         }
     } else if sample < sea_level + 0.02 {
         if temperature > 3.0 {
-            return Tile::Beach;
+            Tile::Beach
         } else {
-            return Tile::Snow;
+            Tile::Snow
         }
     } else if sample < sea_level + 0.1 {
         if temperature < 3.0 {
-            return Tile::Snow;
+            Tile::Snow
         } else if temperature > 60.0 {
-            return Tile::Sahara;
+            Tile::Sahara
         } else {
-            return Tile::Plains;
+            Tile::Plains
         }
     } else if sample < sea_level + 0.2 {
         if temperature < 3.0 {
-            return Tile::Snow;
+            Tile::Snow
         } else if temperature > 60.0 {
-            return Tile::Sahara;
+            Tile::Sahara
         } else {
-            return Tile::Forest;
+            Tile::Forest
         }
     } else if sample < sea_level + 0.3 {
         if temperature > 70.0 {
-            return Tile::Plateau;
+            Tile::Plateau
         } else {
-            return Tile::Mountain;
+            Tile::Mountain
         }
     } else {
         if temperature < 70.0 {
-            return Tile::Snow;
+            Tile::Snow
         } else {
-            return Tile::Plateau;
+            Tile::Plateau
         }
     }
 }
