@@ -34,7 +34,7 @@ impl Tile{
     }
 }
 impl Tile{
-    fn index(&self) -> u8{
+    pub(crate) fn index(&self) -> u8{
         match *self {
             Tile::Sea => 0,
             Tile::Plains => 1,
