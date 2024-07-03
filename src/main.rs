@@ -1,12 +1,13 @@
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
+use bevy::input::mouse::{MouseMotion, MouseWheel};
 use bevy::math::{uvec2, vec2, vec3};
 use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
-use bevy::window::close_on_esc;
-use bevy_pancam::{PanCam, PanCamPlugin};
+use bevy::window::{close_on_esc, PrimaryWindow};
 use crate::engine::fast_tilemap::bundle::MapBundleManaged;
 use crate::engine::fast_tilemap::map::Map;
 use crate::engine::fast_tilemap::plugin::FastTileMapPlugin;
+use crate::engine::pancam::lib::PanCam;
 
 pub mod jungle_noise;
 mod macro_map;
@@ -20,6 +21,7 @@ const TILE_H: usize = 10;
 const MAP_HEIGHT: usize = 512;
 const MAP_WIDTH: usize = 1024;
 
+static mut SCROLL_LEVEL: f32 = 0.0;
 //WINDOW
 
 fn main() {
@@ -29,11 +31,12 @@ fn main() {
         )
         .add_plugins(TilemapPlugin)
         .add_plugins(FastTileMapPlugin::default())
-        .add_plugins(PanCamPlugin)
-        .add_plugins(FrameTimeDiagnosticsPlugin)
-        .add_plugins(LogDiagnosticsPlugin::default())
+        .add_plugins(engine::pancam::lib::PanCamPlugin)
+        // .add_plugins(FrameTimeDiagnosticsPlugin)
+        // .add_plugins(LogDiagnosticsPlugin::default())
         .add_systems(Startup, setup)
         .add_systems(Update, close_on_esc)
+        .add_systems(Update, load_meso_map)
         .run();
 }
 
@@ -139,4 +142,39 @@ fn render_terrain(is_entity: bool,
         border_bundle.transform = Transform::default().with_translation(vec3(0., 0., 2.));
         commands.spawn(border_bundle);
     }
+}
+
+fn load_meso_map(
+    proj: Query<(&mut OrthographicProjection)>,
+    mut cursor_moved_events: EventReader<CursorMoved>,
+    mut camera_query: Query<(&GlobalTransform, &Camera), With<OrthographicProjection>>,
+    maps: Query<&Handle<Map>>,
+    mut materials: ResMut<Assets<Map>>
+) {
+    for event in cursor_moved_events.read() {
+        for map_handle in maps.iter() {
+            let map = materials.get_mut(map_handle).unwrap();
+
+            for (global, camera) in camera_query.iter_mut() {
+                // Translate viewport coordinates to world coordinates
+                if let Some(world) = camera
+                    .viewport_to_world(global, event.position)
+                    .map(|ray| ray.origin.truncate())
+                {
+                    let coord = map.world_to_map(world);
+
+                    let coord = coord
+                        .as_uvec2()
+                        .clamp(uvec2(0, 0), map.map_size() - uvec2(1, 1));
+
+                    let idx = coord.y as usize * map.map_uniform.map_size.x as usize + coord.x as usize;
+
+                    let tile = map.map_texture[idx].to_string();
+                    println!("Scale: {}, Cursor Position: {}:{}, Tile: {}",  proj.single().scale,
+                             coord.x, coord.y, tile
+                    );
+                } // if Some(world)
+            } // for (global, camera)
+        } // for map
+    } // for event
 }

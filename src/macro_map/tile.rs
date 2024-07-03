@@ -33,6 +33,7 @@ impl Tile{
         }
     }
 }
+
 impl Tile{
     pub(crate) fn index(&self) -> u8{
         match *self {
@@ -50,6 +51,7 @@ impl Tile{
         }
     }
 }
+
 impl Tile{
     pub(crate) fn u8colour(&self) -> [u8; 4]{
         match *self {
