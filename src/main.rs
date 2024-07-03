@@ -42,7 +42,15 @@ fn setup(
 ) {
     render_terrain(false, &mut commands, asset_server, &mut materials) ;
 
-    commands.spawn(Camera2dBundle::default()).insert(PanCam::default());
+    commands.spawn(Camera2dBundle::default())
+        .insert(PanCam {
+            grab_buttons: vec![MouseButton::Left, MouseButton::Middle], // which buttons should drag the camera
+            enabled: true, // when false, controls are disabled. See toggle example.
+            zoom_to_cursor: true, // whether to zoom towards the mouse or the center of the screen
+            min_scale: 1., // prevent the camera from zooming too far in
+            max_scale: Some(25.), // prevent the camera from zooming too far out
+            ..default()
+        });
 
 }
 
@@ -89,24 +97,44 @@ fn render_terrain(is_entity: bool,
             ..Default::default()
         });
     } else {
-        let map = Map::builder(
-            // Map size
-            uvec2(MAP_WIDTH as u32, MAP_HEIGHT as u32),
-            // Tile atlas
-            asset_server.load("tile-sheet.png"),
-            // Tile Size
-            vec2(32., 32.),
-        )
-            .build_and_initialize(|m| {
-                for y in 0..m.size().y {
-                    for x in 0..m.size().x {
-                        m.set(x, y, macro_map.map[y as usize].map[x as usize].tile.index() as u32);
-                    }
-                }
-            });
 
-        let mut bundle = MapBundleManaged::new(map, materials.as_mut());
-        bundle.transform = Transform::default().with_translation(vec3(0., 0., 2.));
-        commands.spawn(bundle);
+        let mut map = Map::builder(
+            uvec2(MAP_WIDTH as u32, MAP_HEIGHT as u32),
+            asset_server.load("tile-sheet.png"),
+            vec2(32., 32.),
+        ).build();
+
+        let mut meso_borders = Map::builder(
+            uvec2(MAP_WIDTH as u32, MAP_HEIGHT as u32),
+            asset_server.load("tile-sheet-borders.png"),
+            vec2(32., 32.),
+        ).build();
+
+        let mut m = map.indexer_mut();
+        let mut mb = meso_borders.indexer_mut();
+
+        for y in 0..m.size().y {
+            for x in 0..m.size().x {
+                m.set(x, y, macro_map.map[y as usize].map[x as usize].tile.index() as u32);
+                mb.set(x,y,10);
+                if (x % 16) == 0 {
+                    if (y % 16) == 0 {
+                        mb.set(x, y, 5)
+                    } else {
+                        mb.set(x, y, 1)
+                    }
+                } else if (y % 16) == 0 {
+                    mb.set(x, y, 0)
+                }
+            }
+        }
+
+        let mut map_bundle = MapBundleManaged::new(map, materials.as_mut());
+        map_bundle.transform = Transform::default().with_translation(vec3(0., 0., 1.));
+        commands.spawn(map_bundle);
+
+        let mut border_bundle = MapBundleManaged::new(meso_borders, materials.as_mut());
+        border_bundle.transform = Transform::default().with_translation(vec3(0., 0., 2.));
+        commands.spawn(border_bundle);
     }
 }
