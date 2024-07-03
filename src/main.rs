@@ -1,14 +1,16 @@
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
-use bevy::log::{Level, LogPlugin};
 use bevy::math::{uvec2, vec2, vec3};
 use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
 use bevy::window::close_on_esc;
-use bevy_fast_tilemap::{FastTileMapPlugin, Map, MapBundleManaged};
 use bevy_pancam::{PanCam, PanCamPlugin};
+use crate::engine::fast_tilemap::bundle::MapBundleManaged;
+use crate::engine::fast_tilemap::map::Map;
+use crate::engine::fast_tilemap::plugin::FastTileMapPlugin;
 
 pub mod jungle_noise;
 mod macro_map;
+mod engine;
 
 const SPRITE_SHEET_PATH: &str = "sprite-sheet.png";
 const SPRITE_SCALE_FACTOR: usize = 10;

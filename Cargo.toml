@@ -17,4 +17,3 @@ rayon = "1.10.0"
 bevy_pancam = "0.11.1"
 bevy_ecs_tilemap = { git = "https://github.com/StarArawn/bevy_ecs_tilemap" }
 bevy = "0.13.2"
-bevy_fast_tilemap = "0.7.6"
