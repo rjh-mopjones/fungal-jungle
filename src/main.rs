@@ -58,7 +58,7 @@ fn setup(
                 .spawn(TileBundle {
                     position: tile_pos,
                     texture_index: TileTextureIndex(0),
-                    color: TileColor::from(macro_map.map[y as usize].map[x as usize].tile.colour()),
+                    color: TileColor::from(macro_map.map[y as usize].map[x as usize].tile.normal_colour()),
                     tilemap_id: TilemapId(tilemap_entity),
                     ..Default::default()
                 })
