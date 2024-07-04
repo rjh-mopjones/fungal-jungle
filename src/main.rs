@@ -1,8 +1,9 @@
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::math::{uvec2, vec2, vec3};
 use bevy::prelude::*;
-use bevy_ecs_tilemap::prelude::*;
+use engine::ecs_tilemap::lib::prelude::*;
 use bevy::window::{close_on_esc, PrimaryWindow};
+use crate::engine::ecs_tilemap::lib::TilemapBundle;
 use crate::engine::macro_tilemap::bundle::MapBundleManaged;
 use crate::engine::macro_tilemap::map::Map;
 use crate::engine::macro_tilemap::plugin::FastTileMapPlugin;
@@ -44,7 +45,7 @@ fn setup(
     asset_server: Res<AssetServer>,
     mut materials: ResMut<Assets<Map>>,
 ) {
-    render_terrain(false, &mut commands, asset_server, &mut materials) ;
+    render_terrain(true, &mut commands, asset_server, &mut materials) ;
 
     commands.spawn(Camera2dBundle::default())
         .insert(PanCam {
