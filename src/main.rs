@@ -1,12 +1,11 @@
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
-use bevy::input::mouse::{MouseMotion, MouseWheel};
 use bevy::math::{uvec2, vec2, vec3};
 use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
 use bevy::window::{close_on_esc, PrimaryWindow};
-use crate::engine::fast_tilemap::bundle::MapBundleManaged;
-use crate::engine::fast_tilemap::map::Map;
-use crate::engine::fast_tilemap::plugin::FastTileMapPlugin;
+use crate::engine::macro_tilemap::bundle::MapBundleManaged;
+use crate::engine::macro_tilemap::map::Map;
+use crate::engine::macro_tilemap::plugin::FastTileMapPlugin;
 use crate::engine::pancam::lib::PanCam;
 
 pub mod jungle_noise;
@@ -32,8 +31,8 @@ fn main() {
         .add_plugins(TilemapPlugin)
         .add_plugins(FastTileMapPlugin::default())
         .add_plugins(engine::pancam::lib::PanCamPlugin)
-        // .add_plugins(FrameTimeDiagnosticsPlugin)
-        // .add_plugins(LogDiagnosticsPlugin::default())
+        .add_plugins(FrameTimeDiagnosticsPlugin)
+        .add_plugins(LogDiagnosticsPlugin::default())
         .add_systems(Startup, setup)
         .add_systems(Update, close_on_esc)
         .add_systems(Update, load_meso_map)
@@ -109,28 +108,28 @@ fn render_terrain(is_entity: bool,
             vec2(32., 32.),
         ).build();
 
-        let mut meso_borders = Map::builder(
-            uvec2(MAP_WIDTH as u32, MAP_HEIGHT as u32),
-            asset_server.load("tile-sheet-borders.png"),
-            vec2(32., 32.),
-        ).build();
+        // let mut meso_borders = Map::builder(
+        //     uvec2(MAP_WIDTH as u32, MAP_HEIGHT as u32),
+        //     asset_server.load("tile-sheet-borders.png"),
+        //     vec2(32., 32.),
+        // ).build();
 
         let mut m = map.indexer_mut();
-        let mut mb = meso_borders.indexer_mut();
+        // let mut mb = meso_borders.indexer_mut();
 
         for y in 0..m.size().y {
             for x in 0..m.size().x {
                 m.set(x, y, macro_map.map[y as usize].map[x as usize].tile.index() as u32);
-                mb.set(x,y,10);
-                if (x % 16) == 0 {
-                    if (y % 16) == 0 {
-                        mb.set(x, y, 5)
-                    } else {
-                        mb.set(x, y, 1)
-                    }
-                } else if (y % 16) == 0 {
-                    mb.set(x, y, 0)
-                }
+                // mb.set(x,y,10);
+               // if (x % 16) == 0 {
+               //      if (y % 16) == 0 {
+               //          mb.set(x, y, 5)
+               //      } else {
+               //          mb.set(x, y, 1)
+               //      }
+               //  } else if (y % 16) == 0 {
+               //      mb.set(x, y, 0)
+               //  }
             }
         }
 
@@ -138,9 +137,9 @@ fn render_terrain(is_entity: bool,
         map_bundle.transform = Transform::default().with_translation(vec3(0., 0., 1.));
         commands.spawn(map_bundle);
 
-        let mut border_bundle = MapBundleManaged::new(meso_borders, materials.as_mut());
-        border_bundle.transform = Transform::default().with_translation(vec3(0., 0., 2.));
-        commands.spawn(border_bundle);
+        // let mut border_bundle = MapBundleManaged::new(meso_borders, materials.as_mut());
+        // border_bundle.transform = Transform::default().with_translation(vec3(0., 0., 2.));
+        // commands.spawn(border_bundle);
     }
 }
 
@@ -170,9 +169,9 @@ fn load_meso_map(
                     let idx = coord.y as usize * map.map_uniform.map_size.x as usize + coord.x as usize;
 
                     let tile = map.map_texture[idx].to_string();
-                    println!("Scale: {}, Cursor Position: {}:{}, Tile: {}",  proj.single().scale,
-                             coord.x, coord.y, tile
-                    );
+                    // println!("Scale: {}, Cursor Position: {}:{}, Tile: {}",  proj.single().scale,
+                    //          coord.x, coord.y, tile
+                    // );
                 } // if Some(world)
             } // for (global, camera)
         } // for map
