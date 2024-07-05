@@ -32,8 +32,8 @@ fn main() {
         .add_plugins(TilemapPlugin)
         .add_plugins(FastTileMapPlugin::default())
         .add_plugins(engine::pancam::lib::PanCamPlugin)
-        .add_plugins(FrameTimeDiagnosticsPlugin)
-        .add_plugins(LogDiagnosticsPlugin::default())
+        // .add_plugins(FrameTimeDiagnosticsPlugin)
+        // .add_plugins(LogDiagnosticsPlugin::default())
         .add_systems(Startup, setup)
         .add_systems(Update, close_on_esc)
         .add_systems(Update, load_meso_map)
@@ -71,14 +71,14 @@ fn render_terrain(is_entity: bool,
         let map_size = TilemapSize { x: MAP_WIDTH as u32, y: MAP_HEIGHT as u32 };
         let mut tile_storage = TileStorage::empty(map_size);
 
-        for x in 0..map_size.x {
-            for y in 0..map_size.y {
-                let tile_pos = TilePos { x, y };
+        for meso_map in macro_map.meso_maps {
+            for low_res_tile in meso_map.low_res_map {
+                let tile_pos = TilePos { x: low_res_tile.coords.0 as u32, y: low_res_tile.coords.1 as u32};
                 let tile_entity = commands
                     .spawn(TileBundle {
                         position: tile_pos,
                         texture_index: TileTextureIndex(0),
-                        color: TileColor::from(macro_map.map[y as usize].map[x as usize].tile.normal_colour()),
+                        color: TileColor::from(low_res_tile.tile.normal_colour()),
                         tilemap_id: TilemapId(tilemap_entity),
                         ..Default::default()
                     })
@@ -118,9 +118,16 @@ fn render_terrain(is_entity: bool,
         let mut m = map.indexer_mut();
         // let mut mb = meso_borders.indexer_mut();
 
-        for y in 0..m.size().y {
-            for x in 0..m.size().x {
-                m.set(x, y, macro_map.map[y as usize].map[x as usize].tile.index() as u32);
+        for meso_map in macro_map.meso_maps {
+            for low_res_tile in meso_map.low_res_map {
+                m.set(low_res_tile.coords.0 as u32, low_res_tile.coords.1 as u32,
+                      low_res_tile.tile.index() as u32);
+            }
+        }
+
+        // for y in 0..m.size().y {
+        //     for x in 0..m.size().x {
+        //         m.set(x, y, macro_map.map[y as usize].map[x as usize].tile.index() as u32);
                 // mb.set(x,y,10);
                // if (x % 16) == 0 {
                //      if (y % 16) == 0 {
@@ -131,8 +138,8 @@ fn render_terrain(is_entity: bool,
                //  } else if (y % 16) == 0 {
                //      mb.set(x, y, 0)
                //  }
-            }
-        }
+        //     }
+        // }
 
         let mut map_bundle = MapBundleManaged::new(map, materials.as_mut());
         map_bundle.transform = Transform::default().with_translation(vec3(0., 0., 1.));

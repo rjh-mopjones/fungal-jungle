@@ -8,7 +8,6 @@ use bevy::{
     prelude::*,
 };
 use bevy::math::vec2;
-use crate::engine::macro_tilemap::map::MesoMap;
 
 use crate::engine::macro_tilemap::tile_projection::TileProjection;
 
@@ -162,33 +161,13 @@ impl<C: Customization> MapBuilder<C>
             0u32,
         );
 
-        let meso_scale = 16;
-        let meso_detail = 512;
-
-        let meso_x = self.map.map_size().x / meso_scale;
-        let meso_y = self.map.map_size().y / meso_scale;
-        let meso_len = meso_x * meso_y;
-        self.map.meso_maps.resize(meso_len as usize, MesoMap::default());
-
-        for i in 0..meso_y{
-            for j in 0..meso_x {
-                let idx = (i * meso_y) as usize + j as usize;
-                self.map.meso_maps[idx].index = vec2(i as f32, j as f32);
-                self.map.meso_maps[idx].location = vec2((i * meso_scale ) as f32, (j * meso_scale) as f32);
-                self.map.meso_maps[idx].lod_size = vec2(meso_scale as f32, meso_scale as f32);
-                self.map.meso_maps[idx].detail_size = vec2(meso_detail as f32, meso_detail as f32);
-                self.map.meso_maps[idx].lod_size = vec2(meso_scale as f32, meso_scale as f32);
-                self.map.meso_maps[idx].scale = vec2(1.0/meso_scale as f32, 1.0/meso_scale as f32);
-                self.map.meso_maps[idx].lod_texture.resize((meso_scale * meso_scale) as usize,0u32);
-            }
-        }
-
-        initializer(&mut MapIndexer::<C> { map: &mut self.map });
+        initializer(&mut crate::engine::fast_tilemap::map::MapIndexer::<C> { map: &mut self.map });
 
         self.map.update_inverse_projection();
         self.map.map_uniform.update_world_size();
 
         self.map
+
     } // fn build_and_initialize
 
     /// Build the map component and immediately initialize the map

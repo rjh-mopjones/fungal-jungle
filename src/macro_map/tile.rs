@@ -1,8 +1,9 @@
 use bevy::prelude::Color;
 use bevy::prelude::Color::Rgba;
 
-#[derive(Copy,Clone)]
+#[derive(Default, Copy, Clone, Debug)]
 pub enum Tile {
+    #[default]
     Sea,
     Ice,
     Snow,

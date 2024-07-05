@@ -28,18 +28,6 @@ pub struct DefaultUserData {
     x: u32,
 }
 
-#[derive(Default, Clone, Debug, Reflect, AsBindGroup)]
-pub struct MesoMap {
-    pub(crate) index:  Vec2,
-    pub(crate) lod_texture: Vec<u32>,
-    pub(crate) location:  Vec2,
-    pub(crate) scale: Vec2,
-    pub(crate) detail_size: Vec2,
-    pub(crate) lod_size: Vec2,
-    pub(crate) is_detail_loaded: bool,
-    pub(crate) detail_texture: Vec<u32>,
-}
-
 /// Map, holding handles to a map texture with the tile data and an atlas texture
 /// with the tile renderings.
 #[derive(Asset, Debug, Clone, Reflect, AsBindGroup)]
@@ -57,8 +45,6 @@ pub struct Map<C: Customization = NoCustomization>
     /// Texture containing the tile IDs (one per each pixel)
     #[storage(100, read_only)]
     pub(crate) map_texture: Vec<u32>,
-
-    pub(crate) meso_maps: Vec<MesoMap>,
 
     /// Atlas texture with the individual tiles
     #[texture(101)]
@@ -79,7 +65,6 @@ impl<C: Customization> Default for Map<C> {
         Self {
             map_uniform: Default::default(),
             user_data: Default::default(),
-            meso_maps: Vec::new(),
             map_texture: Vec::new(),
             atlas_texture: Default::default(),
             perspective_defs: Vec::new(),
@@ -399,25 +384,11 @@ impl<'a, C: Customization> MapIndexer<'a, C>
     /// Set tile at given position.
     pub fn set(&mut self, x: u32, y: u32, v: u32) {
         // ensure x/y do not go out of bounds individually (even if the final index is in-bounds)
-        let meso_scale = 16;
-
         if x >= self.size().x || y >= self.size().y {
             return;
         }
         let idx = y as usize * self.size().x as usize + x as usize;
         self.map.map_texture[idx] = v;
-
-        // meso map
-        let (div_x, rem_x) = div_rem_usize(x as usize, meso_scale);
-        let (div_y, rem_y) = div_rem_usize(y as usize, meso_scale);
-        let meso_y = self.map.map_size().y as usize / meso_scale;
-
-        let meso_idx = (div_y * meso_y) + div_x;
-        self.map.meso_maps[meso_idx].lod_texture[(rem_y * meso_scale) + rem_x] = v
-
-
-
-
     }
 
     pub fn world_to_map(&self, world: Vec2) -> Vec2 {

@@ -1,9 +1,15 @@
+use bevy::math::{Vec2, vec2};
+use bevy::utils::default;
 use rayon::iter::plumbing::{bridge, Consumer, Producer, ProducerCallback, UnindexedConsumer};
 use rayon::prelude::*;
 use crate::macro_map::tile::Tile;
 
+
+const MESO_LOW_RES_PIXELS: usize = 16;
+const MESO_HIGH_RES_PIXELS: usize = 512;
+
 pub type Colour = [u8; 4];
-#[derive(Copy,Clone)]
+#[derive(Default, Copy, Clone, Debug)]
 pub struct MacroMapTile {
     pub(crate) tile: Tile,
     pub(crate) temperature: f64,
@@ -11,26 +17,31 @@ pub struct MacroMapTile {
     pub(crate) coords: (f64, f64),
 }
 
-#[derive(Clone)]
-pub struct MacroMapLine{
-    pub(crate) map: Vec<MacroMapTile>
+#[derive(Default, Clone, Debug)]
+pub struct MesoMap {
+    pub(crate) index:  Vec2,
+    pub(crate) location:  Vec2,
+    pub(crate) scale: Vec2,
+    pub(crate) is_high_res_loaded: bool,
+    pub(crate) low_res_map: Vec<MacroMapTile>,
+    pub(crate) high_res_map: Vec<MacroMapTile>
 }
 
 pub struct MacroMap {
     pub(crate) size: (usize, usize),
-    pub(crate) border_value: f64,
-    pub(crate) map: Vec<MacroMapLine>
+    pub(crate) meso_pixels: usize,
+    pub(crate) meso_maps: Vec<MesoMap>
 }
 
 pub struct ParDataIter<'a> {
-    data_slice: &'a [MacroMapLine]
+    data_slice: &'a [MesoMap]
 }
 struct DataProducer<'a> {
-    data_slice : &'a [MacroMapLine],
+    data_slice : &'a [MesoMap],
 }
 
 impl<'a> ParallelIterator for ParDataIter<'a> {
-    type Item = &'a MacroMapLine;
+    type Item = &'a MesoMap;
 
     fn drive_unindexed<C>(self, consumer: C) -> C::Result
     where
@@ -61,8 +72,8 @@ impl<'a> IndexedParallelIterator for ParDataIter<'a> {
 }
 
 impl<'a> Producer for DataProducer<'a> {
-    type Item = &'a MacroMapLine;
-    type IntoIter = std::slice::Iter<'a, MacroMapLine>;
+    type Item = &'a MesoMap;
+    type IntoIter = std::slice::Iter<'a, MesoMap>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.data_slice.iter()
@@ -87,31 +98,27 @@ impl<'a> From<ParDataIter<'a>> for DataProducer<'a> {
 impl MacroMap {
     pub fn parallel_iterator(&self) -> ParDataIter {
         ParDataIter {
-            data_slice : &self.map,
+            data_slice : &self.meso_maps,
         }
     }
 }
 
 impl<'a> IntoParallelIterator for &'a MacroMap{
     type Iter = ParDataIter<'a>;
-    type Item = &'a MacroMapLine;
+    type Item = &'a MesoMap;
 
     fn into_par_iter(self) -> Self::Iter {
-        ParDataIter { data_slice: &self.map}
+        ParDataIter { data_slice: &self.meso_maps}
     }
 }
 
 pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<3> + Sync>(sea_level: f64, width: usize,
                                                                            height:usize, zoom: f64,
                                                                            centre: (f64, f64), generator: &G) -> MacroMap {
-    let x_origin = centre.0 * width as f64;
-    let y_origin = centre.1 * height as f64;
 
-    let x_extent = (width as f64 - (x_origin))/zoom;
-    let y_extent = (height as f64 - (y_origin))/zoom;
-
-    let x_step = x_extent / width as f64;
-    let y_step = y_extent / height as f64;
+    let meso_x = width / MESO_LOW_RES_PIXELS;
+    let meso_y = height / MESO_LOW_RES_PIXELS;
+    let total_meso_tiles = MESO_LOW_RES_PIXELS * MESO_LOW_RES_PIXELS;
 
     let blank_tile = MacroMapTile {
         tile: Tile::Blank,
@@ -120,43 +127,49 @@ pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<3> + Sync
         coords:(0.0,0.0)
     };
 
-    let blank_line = MacroMapLine{
-        map: vec![blank_tile; width]
-    };
+    let meso_map = MesoMap {..default()};
 
     let mut macro_map = MacroMap {
         size: (width, height),
-        border_value: 0.0,
-        map: vec![blank_line.clone(); height]
+        meso_pixels : MESO_LOW_RES_PIXELS,
+        meso_maps: vec![meso_map.clone(); meso_x * meso_y]
     };
 
-    let results = macro_map.map
+    let results = macro_map.meso_maps
         .par_iter()
         .enumerate()
-        .map(|(y, line)| {
-            let current_y = y_origin + y_step * y as f64;
-            let mut new_line = MacroMapLine {
-                map: vec![blank_tile; width]
+        .map(|(index, meso_map)| {
+            let (i, j) = div_rem_usize(index, meso_y);
+            let mut new_meso_map = MesoMap {
+                index : vec2(i as f32, j as f32),
+                location : vec2((i * MESO_LOW_RES_PIXELS) as f32, (j * MESO_LOW_RES_PIXELS) as f32),
+                scale : vec2(1.0/ MESO_LOW_RES_PIXELS as f32, 1.0/ MESO_LOW_RES_PIXELS as f32),
+                is_high_res_loaded: false,
+                low_res_map: vec![blank_tile; total_meso_tiles],
+                high_res_map: vec![]
             };
-            for x in 0..width {
-                let current_x = x_origin + x_step * x as f64;
-                let mut sample: f64 = generator.sample([current_x, current_y, 1.0]);
-                let mut m_temperature: f64 = (((current_y / height as f64) * 150.0) - 50.0)
-                    + 100.0 * generator.sample([current_x, current_y, 1.1]);
-                new_line.map[x] = MacroMapTile {
+            for tile_idx in 0..total_meso_tiles {
+                let (local_x, local_y) = div_rem_usize(tile_idx, MESO_LOW_RES_PIXELS);
+                let global_x = (new_meso_map.location.x as usize + local_x) as f64;
+                let global_y = (new_meso_map.location.y as usize + local_y) as f64;
+
+                let mut sample: f64 = generator.sample([global_x, global_y, 1.0]);
+                let mut m_temperature: f64 = (((global_y/ height as f64) * 150.0) - 50.0)
+                    + 100.0 * generator.sample([global_x, global_y, 1.1]);
+                new_meso_map.low_res_map[tile_idx] = MacroMapTile {
                     tile: create_tile(sea_level, sample, m_temperature),
                     temperature: m_temperature,
                     height: sample,
-                    coords: (x as f64, y as f64)
+                    coords: (global_x, global_y)
                 }
             }
-            return new_line;
+            return new_meso_map;
         }).collect();
 
     MacroMap {
         size: (width, height),
-        border_value: 0.0,
-        map: results
+        meso_maps: results,
+        meso_pixels: MESO_LOW_RES_PIXELS,
     }
 }
 
@@ -210,13 +223,14 @@ pub fn write_macro_map_to_file(macro_map: MacroMap, filename: &str) {
     let (width, height) = macro_map.size;
     let mut result = Vec::with_capacity(height * width);
 
-    for y in 0..height {
-        for x in 0..width {
-            for z in macro_map.map[y].map[x].tile.u8colour(){
-                result.push(z);
+    for meso_map in macro_map.meso_maps {
+        for low_res_tile in meso_map.low_res_map {
+            for channel in low_res_tile.tile.u8colour(){
+                result.push(channel);
             }
         }
     }
+
     let _ = image::save_buffer(
         filename,
         &result,
@@ -224,4 +238,14 @@ pub fn write_macro_map_to_file(macro_map: MacroMap, filename: &str) {
         height as u32,
         image::ColorType::Rgba8,
     );
+}
+
+pub fn div_rem<T: std::ops::Div<Output=T> + std::ops::Rem<Output=T> + Copy>(x: T, y: T) -> (T, T) {
+    let quot = x / y;
+    let rem = x % y;
+    (quot, rem)
+}
+
+pub fn div_rem_usize(x: usize, y: usize) -> (usize, usize) {
+    crate::engine::macro_tilemap::map::div_rem(x, y)
 }
