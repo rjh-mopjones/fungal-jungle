@@ -4,9 +4,9 @@ use bevy::prelude::*;
 use engine::ecs_tilemap::lib::prelude::*;
 use bevy::window::{close_on_esc, PrimaryWindow};
 use crate::engine::ecs_tilemap::lib::TilemapBundle;
-use crate::engine::macro_tilemap::bundle::MapBundleManaged;
-use crate::engine::macro_tilemap::map::Map;
-use crate::engine::macro_tilemap::plugin::FastTileMapPlugin;
+use crate::engine::fast_tilemap::bundle::MapBundleManaged;
+use crate::engine::fast_tilemap::map::Map;
+use crate::engine::fast_tilemap::plugin::FastTileMapPlugin;
 use crate::engine::pancam::lib::PanCam;
 
 pub mod jungle_noise;

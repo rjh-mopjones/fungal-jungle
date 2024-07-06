@@ -247,5 +247,5 @@ pub fn div_rem<T: std::ops::Div<Output=T> + std::ops::Rem<Output=T> + Copy>(x: T
 }
 
 pub fn div_rem_usize(x: usize, y: usize) -> (usize, usize) {
-    crate::engine::macro_tilemap::map::div_rem(x, y)
+    div_rem(x, y)
 }
