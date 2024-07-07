@@ -30,6 +30,7 @@ pub struct MesoMap {
     pub(crate) low_res_dynamic_image: DynamicImage
 }
 
+#[derive(Default, Clone, Debug)]
 pub struct MacroMap {
     pub(crate) size: (usize, usize),
     pub(crate) meso_pixels: usize,
@@ -147,14 +148,14 @@ pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<3> + Sync
             let (i, j) = div_rem_usize(index, meso_y);
             let mut new_meso_map = MesoMap {
                 index : vec2(i as f32, j as f32),
-                location : vec2((i * MESO_LOW_RES_PIXELS) as f32, (j * MESO_LOW_RES_PIXELS) as f32),
+                location : vec2(((i * 16) + 8 )as f32, ((j * 16) + 8) as f32),
                 scale : vec2(1.0/ MESO_LOW_RES_PIXELS as f32, 1.0/ MESO_LOW_RES_PIXELS as f32),
                 is_high_res_loaded: false,
                 low_res_map: vec![blank_tile; total_meso_tiles],
                 high_res_map: vec![],
                 low_res_dynamic_image: DynamicImage::default()
             };
-            let mut img: RgbImage = ImageBuffer::new(MESO_LOW_RES_PIXELS as u32, MESO_HIGH_RES_PIXELS as u32);
+            let mut img: RgbImage = ImageBuffer::new(MESO_LOW_RES_PIXELS as u32, MESO_LOW_RES_PIXELS as u32);
 
             for tile_idx in 0..total_meso_tiles {
                 let (local_x, local_y) = div_rem_usize(tile_idx, MESO_LOW_RES_PIXELS);
@@ -165,7 +166,8 @@ pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<3> + Sync
                 let mut m_temperature: f64 = (((global_y/ height as f64) * 150.0) - 50.0)
                     + 100.0 * generator.sample([global_x, global_y, 1.1]);
                 let mut m_tile = create_tile(sea_level, sample, m_temperature);
-                img.put_pixel(local_x as u32, local_y as u32, m_tile.rbg_colour());
+                // img.put_pixel(local_x as u32, MESO_LOW_RES_PIXELS as u32 - local_y as u32 - 1u32, m_tile.rbg_colour());
+                img.put_pixel(MESO_LOW_RES_PIXELS as u32 - local_x as u32 - 1u32, local_y as u32, m_tile.rbg_colour());
 
                 new_meso_map.low_res_map[tile_idx] = MacroMapTile {
                     tile: m_tile,
@@ -231,6 +233,11 @@ fn create_tile(sea_level: f64, sample: f64, temperature: f64) -> Tile {
             Tile::Plateau
         }
     }
+}
+
+pub fn write_meso_map_to_file(macro_map: MacroMap, index :usize, filename: &str) {
+    let image : DynamicImage = macro_map.meso_maps[index].low_res_dynamic_image.clone();
+    image.save(filename).unwrap();
 }
 
 pub fn write_macro_map_to_file(macro_map: MacroMap, filename: &str) {

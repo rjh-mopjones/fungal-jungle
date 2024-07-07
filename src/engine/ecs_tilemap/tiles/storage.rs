@@ -62,6 +62,10 @@ impl TileStorage {
     ///
     /// Panics if the given `tile_pos` doesn't lie within the extents of the underlying tile map.
     pub fn set(&mut self, tile_pos: &TilePos, tile_entity: Entity) {
+        let index = tile_pos.to_index(&self.size);
+        if (index == 2048){
+            println!("FUCK")
+        }
         self.tiles[tile_pos.to_index(&self.size)].replace(tile_entity);
     }
 
