@@ -21,7 +21,6 @@ pub fn generate_in_house_tidal_noise(width: usize, height: usize, seed: u64) -> 
     let centre = (0.0, 0.0);
 
 
-    println!("generating macro map");
     return generate_macro_map(SEA_LEVEL, width, height, zoom, centre, &generator);
 
     // Do curve with control points for sea level

@@ -67,6 +67,7 @@ fn render_terrain(is_entity: bool,
     let macro_map = jungle_noise::tidal::generate_in_house_tidal_noise(MAP_WIDTH, MAP_HEIGHT, 42);
     if is_entity {
         let texture_handle: Handle<Image> = asset_server.load("one-tile.png");
+
         let tilemap_entity = commands.spawn_empty().id();
         let map_size = TilemapSize { x: MAP_WIDTH as u32, y: MAP_HEIGHT as u32 };
         let mut tile_storage = TileStorage::empty(map_size);
@@ -87,6 +88,8 @@ fn render_terrain(is_entity: bool,
             }
         }
 
+        // let meso_map_images: Vec<Handle<Image>> = macro_map.get_meso_map_images();
+
         let tile_size = TilemapTileSize { x: 16.0, y: 16.0 };
         let grid_size = tile_size.into();
         let map_type = TilemapType::Square;
@@ -96,6 +99,7 @@ fn render_terrain(is_entity: bool,
             map_type,
             size: map_size,
             texture: TilemapTexture::Single(texture_handle),
+            // texture: TilemapTexture::Vector(meso_map_images),
             storage: tile_storage,
             tile_size,
             transform: get_tilemap_center_transform(&map_size, &grid_size, &map_type, 0.0),
@@ -177,9 +181,9 @@ fn load_meso_map(
                     let idx = coord.y as usize * map.map_uniform.map_size.x as usize + coord.x as usize;
 
                     let tile = map.map_texture[idx].to_string();
-                    // println!("Scale: {}, Cursor Position: {}:{}, Tile: {}",  proj.single().scale,
-                    //          coord.x, coord.y, tile
-                    // );
+                    println!("Scale: {}, Cursor Position: {}:{}, Tile: {}",  proj.single().scale,
+                             coord.x, coord.y, tile
+                    );
                 } // if Some(world)
             } // for (global, camera)
         } // for map

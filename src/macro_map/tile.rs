@@ -1,5 +1,6 @@
 use bevy::prelude::Color;
 use bevy::prelude::Color::Rgba;
+use image::Rgb;
 
 #[derive(Default, Copy, Clone, Debug)]
 pub enum Tile {
@@ -67,6 +68,24 @@ impl Tile{
             Tile::Plateau=> [139,69,19, 255],
             Tile::Beach=> [222,184,135, 255],
             _ => {[0,0,0,255]}
+        }
+    }
+}
+
+impl Tile{
+    pub(crate) fn rbg_colour(&self) -> Rgb<u8>{
+        match *self {
+            Tile::Sea =>Rgb([0,191,255]),
+            Tile::Plains => Rgb([50, 205, 50]),
+            Tile::Ice => Rgb([255, 255, 255]),
+            Tile::Snow => Rgb([211,211,211]),
+            Tile::Forest=> Rgb([0, 100, 0]),
+            Tile::Desert=> Rgb([255,215,0]),
+            Tile::Sahara=> Rgb([255,165,0]),
+            Tile::Mountain=> Rgb([105,105,105]),
+            Tile::Plateau=> Rgb([139,69,19]),
+            Tile::Beach=> Rgb([222,184,135]),
+            _ => Rgb([0,0,0])
         }
     }
 }

@@ -1,8 +1,10 @@
+use std::time::Instant;
 use bevy::math::{Vec2, vec2};
 use bevy::utils::default;
 use rayon::iter::plumbing::{bridge, Consumer, Producer, ProducerCallback, UnindexedConsumer};
 use rayon::prelude::*;
 use crate::macro_map::tile::Tile;
+use image::{DynamicImage, ImageBuffer, RgbImage}; use bevy::prelude::*;
 
 
 const MESO_LOW_RES_PIXELS: usize = 16;
@@ -24,7 +26,8 @@ pub struct MesoMap {
     pub(crate) scale: Vec2,
     pub(crate) is_high_res_loaded: bool,
     pub(crate) low_res_map: Vec<MacroMapTile>,
-    pub(crate) high_res_map: Vec<MacroMapTile>
+    pub(crate) high_res_map: Vec<MacroMapTile>,
+    pub(crate) low_res_dynamic_image: DynamicImage
 }
 
 pub struct MacroMap {
@@ -116,6 +119,8 @@ pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<3> + Sync
                                                                            height:usize, zoom: f64,
                                                                            centre: (f64, f64), generator: &G) -> MacroMap {
 
+    let now = Instant::now();
+
     let meso_x = width / MESO_LOW_RES_PIXELS;
     let meso_y = height / MESO_LOW_RES_PIXELS;
     let total_meso_tiles = MESO_LOW_RES_PIXELS * MESO_LOW_RES_PIXELS;
@@ -146,8 +151,11 @@ pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<3> + Sync
                 scale : vec2(1.0/ MESO_LOW_RES_PIXELS as f32, 1.0/ MESO_LOW_RES_PIXELS as f32),
                 is_high_res_loaded: false,
                 low_res_map: vec![blank_tile; total_meso_tiles],
-                high_res_map: vec![]
+                high_res_map: vec![],
+                low_res_dynamic_image: DynamicImage::default()
             };
+            let mut img: RgbImage = ImageBuffer::new(MESO_LOW_RES_PIXELS as u32, MESO_HIGH_RES_PIXELS as u32);
+
             for tile_idx in 0..total_meso_tiles {
                 let (local_x, local_y) = div_rem_usize(tile_idx, MESO_LOW_RES_PIXELS);
                 let global_x = (new_meso_map.location.x as usize + local_x) as f64;
@@ -156,16 +164,22 @@ pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<3> + Sync
                 let mut sample: f64 = generator.sample([global_x, global_y, 1.0]);
                 let mut m_temperature: f64 = (((global_y/ height as f64) * 150.0) - 50.0)
                     + 100.0 * generator.sample([global_x, global_y, 1.1]);
+                let mut m_tile = create_tile(sea_level, sample, m_temperature);
+                img.put_pixel(local_x as u32, local_y as u32, m_tile.rbg_colour());
+
                 new_meso_map.low_res_map[tile_idx] = MacroMapTile {
-                    tile: create_tile(sea_level, sample, m_temperature),
+                    tile: m_tile,
                     temperature: m_temperature,
                     height: sample,
                     coords: (global_x, global_y)
-                }
+                };
             }
+            new_meso_map.low_res_dynamic_image = DynamicImage::from(img).to_rgba8().into();
             return new_meso_map;
         }).collect();
 
+    let elapsed = now.elapsed();
+    println!("Time to generate MacroMap: {:.2?}", elapsed);
     MacroMap {
         size: (width, height),
         meso_maps: results,
