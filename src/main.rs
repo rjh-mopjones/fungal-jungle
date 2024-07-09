@@ -1,15 +1,15 @@
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
-use bevy::math::{uvec2, vec2, vec3};
+use bevy::math::{uvec2};
 use bevy::prelude::*;
 use bevy::render::render_asset::RenderAssetUsages;
 use engine::ecs_tilemap::lib::prelude::*;
-use bevy::window::{close_on_esc, PrimaryWindow};
+use bevy::window::{close_on_esc};
+use image::imageops::FilterType;
 use crate::engine::ecs_tilemap::lib::TilemapBundle;
-use crate::engine::fast_tilemap::bundle::MapBundleManaged;
 use crate::engine::fast_tilemap::map::Map;
 use crate::engine::fast_tilemap::plugin::FastTileMapPlugin;
 use crate::engine::pancam::lib::PanCam;
-use crate::macro_map::macro_map::{MacroMap, MesoMap, write_macro_map_to_file, write_meso_map_to_file};
+use crate::macro_map::macro_map::{write_meso_map_to_file};
 
 pub mod jungle_noise;
 mod macro_map;
@@ -55,8 +55,8 @@ fn setup(
             grab_buttons: vec![MouseButton::Left, MouseButton::Middle], // which buttons should drag the camera
             enabled: true, // when false, controls are disabled. See toggle example.
             zoom_to_cursor: true, // whether to zoom towards the mouse or the center of the screen
-            // min_scale: 1., // prevent the camera from zooming too far in
-            max_scale: Some(25.), // prevent the camera from zooming too far out
+            min_scale: 0.25, // prevent the camera from zooming too far in
+            max_scale: Some(5.), // prevent the camera from zooming too far out
             ..default()
         });
 
@@ -76,7 +76,7 @@ fn render_terrain(mut commands: &mut Commands,
     let mut meso_map_images: Vec<Handle<Image>> = vec![];
 
     for (i, meso_map) in macro_map.meso_maps.iter().enumerate() {
-            let tile_pos = TilePos { x: meso_map.index.x as u32, y: meso_map.index.y as u32};
+            let tile_pos = TilePos { x: meso_map.index.x as u32, y: map_size.y - 1 - meso_map.index.y as u32};
             let tile_entity = commands
                 .spawn(TileBundle {
                     position: tile_pos,
@@ -86,16 +86,12 @@ fn render_terrain(mut commands: &mut Commands,
                 })
                 .id();
             tile_storage.set(&tile_pos, tile_entity);
-            // let img = Image::from_dynamic(meso_map.low_res_dynamic_image.clone(), false, RenderAssetUsages::default());
-            // let handle = images.add(img);
-            meso_map_images.insert(0, images.add(
-                Image::from_dynamic(meso_map.low_res_dynamic_image.clone(), false, RenderAssetUsages::default())
-            ));
+        meso_map_images.push(images.add(
+            Image::from_dynamic(meso_map.low_res_dynamic_image.clone().fliph().resize(64, 64, FilterType::Nearest), false, RenderAssetUsages::default())
+        ));
     }
 
-    // let meso_map_images: Vec<Handle<Image>> = macro_map.get_meso_map_images();
-
-    let tile_size = TilemapTileSize { x: 16.0, y: 16.0 };
+    let tile_size = TilemapTileSize { x: 64.0, y: 64.0 };
     let grid_size = tile_size.into();
     let map_type = TilemapType::Square;
 
