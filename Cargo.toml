@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-image = "0.24"
+image = "0.25.1"
 noise = { version = "0.9.0", features = ["images"] }
 #libnoise = "1.1.2"
 itertools = "0.12.1"
@@ -14,5 +14,6 @@ num-traits = "0.2.19"
 rand_chacha = "0.3.1"
 rand = "0.8.5"
 rayon = "1.10.0"
-bevy = "0.13.2"
+bevy = "0.14.0"
 regex = "1.10.5"
+bevy_ecs_tilemap = { git = "https://github.com/StarArawn/bevy_ecs_tilemap.git" }

@@ -1,14 +1,11 @@
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
-use bevy::math::{uvec2};
 use bevy::prelude::*;
 use bevy::render::render_asset::RenderAssetUsages;
-use engine::ecs_tilemap::lib::prelude::*;
-use bevy::window::{close_on_esc};
+use bevy_ecs_tilemap::map::{TilemapId, TilemapTexture, TilemapType};
+use bevy_ecs_tilemap::prelude::{get_tilemap_center_transform, TileBundle, TilemapSize, TilemapTileSize, TilePos, TileStorage, TileTextureIndex};
+use bevy_ecs_tilemap::{TilemapBundle, TilemapPlugin};
 use image::imageops::FilterType;
-use crate::engine::ecs_tilemap::lib::TilemapBundle;
-use crate::engine::fast_tilemap::map::Map;
-use crate::engine::fast_tilemap::plugin::FastTileMapPlugin;
-use crate::engine::pancam::lib::PanCam;
+use crate::engine::pancam::lib::{PanCam, PanCamPlugin};
 use crate::macro_map::macro_map::{write_meso_map_to_file};
 
 pub mod jungle_noise;
@@ -31,44 +28,42 @@ fn main() {
         .add_plugins(DefaultPlugins
              .set(ImagePlugin::default_nearest())
         )
+        .add_plugins(PanCamPlugin)
         .add_plugins(TilemapPlugin)
-        .add_plugins(FastTileMapPlugin::default())
-        .add_plugins(engine::pancam::lib::PanCamPlugin)
         .add_plugins(FrameTimeDiagnosticsPlugin)
         .add_plugins(LogDiagnosticsPlugin::default())
         .add_systems(Startup, setup)
-        .add_systems(Update, close_on_esc)
-        .add_systems(Update, load_meso_map)
         .run();
 }
 
 fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut materials: ResMut<Assets<Map>>,
     images: ResMut<Assets<Image>>
 ) {
-    render_terrain(&mut commands, asset_server, &mut materials, images) ;
-
     commands.spawn(Camera2dBundle::default())
         .insert(PanCam {
             grab_buttons: vec![MouseButton::Left, MouseButton::Middle], // which buttons should drag the camera
             enabled: true, // when false, controls are disabled. See toggle example.
             zoom_to_cursor: true, // whether to zoom towards the mouse or the center of the screen
             min_scale: 0.25, // prevent the camera from zooming too far in
-            max_scale: Some(5.), // prevent the camera from zooming too far out
+            max_scale: Some(2.5), // prevent the camera from zooming too far out
             ..default()
         });
-
+    render_terrain(
+        &mut commands,
+        asset_server,
+        images
+    ) ;
 }
 
 fn render_terrain(mut commands: &mut Commands,
                   asset_server: Res<AssetServer>,
-                  mut materials: &mut ResMut<Assets<Map>>,
                   mut images: ResMut<Assets<Image>>
 ) {
     let macro_map = jungle_noise::tidal::generate_in_house_tidal_noise(MAP_WIDTH, MAP_HEIGHT, 42);
     write_meso_map_to_file(macro_map.clone(), 10, "meso-map.png");
+    let texture_handle: Handle<Image> = asset_server.load("tiles.png");
     let tilemap_entity = commands.spawn_empty().id();
     let map_size = TilemapSize { x: (MAP_WIDTH / 16) as u32, y: (MAP_HEIGHT / 16) as u32 };
 
@@ -87,7 +82,9 @@ fn render_terrain(mut commands: &mut Commands,
                 .id();
             tile_storage.set(&tile_pos, tile_entity);
         meso_map_images.push(images.add(
-            Image::from_dynamic(meso_map.low_res_dynamic_image.clone().fliph().resize(64, 64, FilterType::Nearest), false, RenderAssetUsages::default())
+            Image::from_dynamic(meso_map.low_res_dynamic_image.clone()
+                                    .fliph()
+                                    .resize(64, 64, FilterType::Nearest), false, RenderAssetUsages::default())
         ));
     }
 
@@ -105,40 +102,4 @@ fn render_terrain(mut commands: &mut Commands,
         transform: get_tilemap_center_transform(&map_size, &grid_size, &map_type, 0.0),
         ..Default::default()
     });
-}
-
-
-fn load_meso_map(
-    proj: Query<(&mut OrthographicProjection)>,
-    mut cursor_moved_events: EventReader<CursorMoved>,
-    mut camera_query: Query<(&GlobalTransform, &Camera), With<OrthographicProjection>>,
-    maps: Query<&Handle<Map>>,
-    mut materials: ResMut<Assets<Map>>
-) {
-    for event in cursor_moved_events.read() {
-        for map_handle in maps.iter() {
-            let map = materials.get_mut(map_handle).unwrap();
-
-            for (global, camera) in camera_query.iter_mut() {
-                // Translate viewport coordinates to world coordinates
-                if let Some(world) = camera
-                    .viewport_to_world(global, event.position)
-                    .map(|ray| ray.origin.truncate())
-                {
-                    let coord = map.world_to_map(world);
-
-                    let coord = coord
-                        .as_uvec2()
-                        .clamp(uvec2(0, 0), map.map_size() - uvec2(1, 1));
-
-                    let idx = coord.y as usize * map.map_uniform.map_size.x as usize + coord.x as usize;
-
-                    let tile = map.map_texture[idx].to_string();
-                    println!("Scale: {}, Cursor Position: {}:{}, Tile: {}",  proj.single().scale,
-                             coord.x, coord.y, tile
-                    );
-                } // if Some(world)
-            } // for (global, camera)
-        } // for map
-    } // for event
 }
