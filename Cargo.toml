@@ -17,3 +17,4 @@ rayon = "1.10.0"
 bevy = "0.14.0"
 regex = "1.10.5"
 bevy_ecs_tilemap = { git = "https://github.com/StarArawn/bevy_ecs_tilemap.git" }
+bevy-inspector-egui = "0.25.1"
