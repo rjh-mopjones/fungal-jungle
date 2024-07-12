@@ -1,12 +1,14 @@
+use bevy::prelude::LinearRgba;
 use std::default::Default;
+use bevy::color::palettes::css::{WHEAT, WHITE};
 use bevy::prelude::Name;
-use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::input::common_conditions::input_toggle_active;
 use bevy::prelude::*;
 use bevy::render::render_asset::RenderAssetUsages;
 use bevy_ecs_tilemap::map::{TilemapId, TilemapTexture, TilemapType};
-use bevy_ecs_tilemap::prelude::{get_tilemap_center_transform, TileBundle, TilemapSize, TilemapTileSize, TilePos, TileStorage, TileTextureIndex};
+use bevy_ecs_tilemap::prelude::*;
 use bevy_ecs_tilemap::{TilemapBundle, TilemapPlugin};
+use bevy::prelude::Color as OtherColor;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use image::imageops::FilterType;
 use crate::engine::pancam::lib::{PanCam, PanCamPlugin};
@@ -27,19 +29,19 @@ const MAP_WIDTH: usize = 1024;
 static mut SCROLL_LEVEL: f32 = 0.0;
 //WINDOW
 
-fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins
-             .set(ImagePlugin::default_nearest())
-        )
-        .add_plugins(PanCamPlugin)
-        .add_plugins(WorldInspectorPlugin::default().run_if(input_toggle_active(true, KeyCode::Escape)))
-        .add_plugins(TilemapPlugin)
-        .add_plugins(FrameTimeDiagnosticsPlugin)
-        .add_plugins(LogDiagnosticsPlugin::default())
-        .add_systems(Startup, setup)
-        .run();
+
+#[derive(Resource)]
+pub struct CursorPos(Vec2);
+impl Default for CursorPos {
+    fn default() -> Self {
+        // Initialize the cursor pos at some far away place. It will get updated
+        // correctly when the cursor moves.
+        Self(Vec2::new(-1000.0, -1000.0))
+    }
 }
+
+#[derive(Component)]
+struct HighlightedTile;
 
 fn setup(
     mut commands: Commands,
@@ -60,6 +62,55 @@ fn setup(
         asset_server,
         images
     ) ;
+}
+
+pub fn update_cursor_pos(
+    camera_q: Query<(&GlobalTransform, &Camera)>,
+    mut cursor_moved_events: EventReader<CursorMoved>,
+    mut cursor_pos: ResMut<CursorPos>,
+) {
+    for cursor_moved in cursor_moved_events.read() {
+        for (cam_t, cam) in camera_q.iter() {
+            if let Some(pos) = cam.viewport_to_world_2d(cam_t, cursor_moved.position) {
+                *cursor_pos = CursorPos(pos);
+            }
+        }
+    }
+}
+
+fn highlight_tile(mut commands: Commands,
+                  tilemap_q: Query<(
+                      &TilemapSize,
+                      &TilemapGridSize,
+                      &TilemapType,
+                      &TileStorage,
+                      &Transform,
+                  )>,
+                  highlighted_tiles_q: Query<Entity, With<HighlightedTile>>,
+                  cursor_pos: Res<CursorPos>,
+) {
+    for highlighted_tile_entity in highlighted_tiles_q.iter() {
+        commands.entity(highlighted_tile_entity).insert(TileColor(OtherColor::LinearRgba(LinearRgba::from(WHITE))));
+    }
+
+    for (map_size, grid_size, map_type, tile_storage, map_transform) in tilemap_q.iter() {
+        let cursor_pos: Vec2 = cursor_pos.0;
+        let cursor_in_map_pos: Vec2 = {
+            let cursor_pos = Vec4::from((cursor_pos, 0.0, 1.0));
+            let cursor_in_map_pos = map_transform.compute_matrix().inverse() * cursor_pos;
+            cursor_in_map_pos.xy()
+        };
+        if let Some(tile_pos) =
+            TilePos::from_world_pos(&cursor_in_map_pos, map_size, grid_size, map_type)
+        {
+            if let Some(tile_entity) = tile_storage.get(&tile_pos) {
+                commands.entity(tile_entity).insert(TileColor(OtherColor::LinearRgba(LinearRgba::from(WHEAT))));
+                commands.entity(tile_entity).insert(HighlightedTile);
+            }
+
+        }
+
+    }
 }
 
 fn render_terrain(mut commands: &mut Commands,
@@ -109,4 +160,21 @@ fn render_terrain(mut commands: &mut Commands,
         transform: get_tilemap_center_transform(&map_size, &grid_size, &map_type, 0.0),
         ..Default::default()
     }).push_children(&*meso_map_entites);
+}
+
+fn main() {
+    App::new()
+        .add_plugins(DefaultPlugins
+            .set(ImagePlugin::default_nearest())
+        )
+        .add_plugins(PanCamPlugin)
+        .add_plugins(WorldInspectorPlugin::default().run_if(input_toggle_active(true, KeyCode::Escape)))
+        .add_plugins(TilemapPlugin)
+        // .add_plugins(FrameTimeDiagnosticsPlugin)
+        // .add_plugins(LogDiagnosticsPlugin::default())
+        .init_resource::<CursorPos>()
+        .add_systems(Startup, setup)
+        .add_systems(First, update_cursor_pos)
+        .add_systems(Update, highlight_tile)
+        .run();
 }
