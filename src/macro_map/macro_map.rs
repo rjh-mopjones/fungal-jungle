@@ -4,7 +4,7 @@ use bevy::utils::default;
 use rayon::iter::plumbing::{bridge, Consumer, Producer, ProducerCallback, UnindexedConsumer};
 use rayon::prelude::*;
 use crate::macro_map::tile::Tile;
-use image::{DynamicImage, ImageBuffer, RgbImage}; use bevy::prelude::*;
+use image::{DynamicImage, GenericImage, ImageBuffer, RgbImage}; use bevy::prelude::*;
 
 
 const MESO_LOW_RES_PIXELS: usize = 16;
@@ -117,7 +117,7 @@ impl<'a> IntoParallelIterator for &'a MacroMap{
 }
 
 pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<3> + Sync>(sea_level: f64, width: usize,
-                                                                           height:usize, zoom: f64,
+                                                                           height:usize, zoom: usize,
                                                                            centre: (f64, f64), generator: &G) -> MacroMap {
 
     let now = Instant::now();
@@ -146,35 +146,53 @@ pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<3> + Sync
         .enumerate()
         .map(|(index, meso_map)| {
             let (i, j) = div_rem_usize(index, meso_y);
+            println!("On meso map {}/64, {}/32", i, j);
             let mut new_meso_map = MesoMap {
                 index : vec2(i as f32, j as f32),
                 location : vec2(((i * 16) + 8 )as f32, ((j * 16) + 8) as f32),
                 scale : vec2(1.0/ MESO_LOW_RES_PIXELS as f32, 1.0/ MESO_LOW_RES_PIXELS as f32),
                 is_high_res_loaded: false,
-                low_res_map: vec![blank_tile; total_meso_tiles],
+                low_res_map: vec![blank_tile; total_meso_tiles * zoom],
                 high_res_map: vec![],
                 low_res_dynamic_image: DynamicImage::default()
             };
-            let mut img: RgbImage = ImageBuffer::new(MESO_LOW_RES_PIXELS as u32, MESO_LOW_RES_PIXELS as u32);
+            let mut img: RgbImage = ImageBuffer::new(MESO_LOW_RES_PIXELS as u32 * zoom as u32,  MESO_LOW_RES_PIXELS as u32 * zoom as u32);
 
             for tile_idx in 0..total_meso_tiles {
                 let (local_x, local_y) = div_rem_usize(tile_idx, MESO_LOW_RES_PIXELS);
                 let global_x = (new_meso_map.location.x as usize + local_x) as f64;
                 let global_y = (new_meso_map.location.y as usize + local_y) as f64;
+                let zoomed_tile_idx = tile_idx * zoom;
+                let zoomed_x = local_x * zoom;
+                let zoomed_y = local_y * zoom;
 
-                let mut sample: f64 = generator.sample([global_x, global_y, 1.0]);
-                let mut m_temperature: f64 = (((global_y/ height as f64) * 150.0) - 50.0)
-                    + 100.0 * generator.sample([global_x, global_y, 1.1]);
-                let mut m_tile = create_tile(sea_level, sample, m_temperature);
-                // img.put_pixel(local_x as u32, MESO_LOW_RES_PIXELS as u32 - local_y as u32 - 1u32, m_tile.rbg_colour());
-                img.put_pixel(MESO_LOW_RES_PIXELS as u32 - local_x as u32 - 1u32, local_y as u32, m_tile.rbg_colour());
+                for x_step in 0..zoom {
+                    for y_step in 0..zoom{
+                        let x_extent :f64 = (1.0 / zoom as f64) * x_step as f64;
+                        let y_extent :f64 = (1.0 / zoom as f64) * y_step as f64;
+                        let mut sample: f64 = generator.sample([global_x + x_extent, global_y+y_extent, 1.0]);
+                        let mut m_temperature: f64 = ((((global_y+y_extent)/ height as f64) * 150.0) - 50.0)
+                            + 100.0 * generator.sample([global_x+x_extent, global_y+y_extent, 1.1]);
+                        let mut m_tile = create_tile(sea_level, sample, m_temperature);
+                        // img.put_pixel(local_x as u32, MESO_LOW_RES_PIXELS as u32 - local_y as u32 - 1u32, m_tile.rbg_colour());
+                        // let x_pixel = MESO_LOW_RES_PIXELS as u32 * zoom as u32 - local_x as u32 - step as u32 - 1u32;
+                        // let y_pixel = local_y as u32 + step as u32;
+                        let x_pixel = MESO_LOW_RES_PIXELS as u32 * zoom as u32 - zoomed_x as u32 - x_step as u32 - 1u32;
+                        let y_pixel = zoomed_y as u32 + y_step as u32;
 
-                new_meso_map.low_res_map[tile_idx] = MacroMapTile {
-                    tile: m_tile,
-                    temperature: m_temperature,
-                    height: sample,
-                    coords: (global_x, global_y)
-                };
+                        img.put_pixel(x_pixel,
+                                      y_pixel, m_tile.rbg_colour());
+                        new_meso_map.low_res_map[zoomed_tile_idx + y_step] = MacroMapTile {
+                            tile: m_tile,
+                            temperature: m_temperature,
+                            height: sample,
+                            coords: (global_x, global_y)
+                        };
+
+                    }
+
+                }
+
             }
             new_meso_map.low_res_dynamic_image = DynamicImage::from(img).to_rgba8().into();
             return new_meso_map;
@@ -241,24 +259,22 @@ pub fn write_meso_map_to_file(macro_map: MacroMap, index :usize, filename: &str)
 }
 
 pub fn write_macro_map_to_file(macro_map: MacroMap, filename: &str) {
-    let (width, height) = macro_map.size;
-    let mut result = Vec::with_capacity(height * width);
+    let cols = 64;
+    let rows = 32;
+    let meso_map_res = macro_map.meso_maps[0].low_res_map.len()/2;
+    let mut combined_image = ImageBuffer::new((meso_map_res as u32 * cols as u32), (meso_map_res as u32 * rows as u32));
 
-    for meso_map in macro_map.meso_maps {
-        for low_res_tile in meso_map.low_res_map {
-            for channel in low_res_tile.tile.u8colour(){
-                result.push(channel);
-            }
-        }
+    // Iterate over the images and place them in the combined image
+    for (idx, meso_map) in macro_map.meso_maps.iter().enumerate(){
+        let (i, j) = div_rem_usize(idx, rows);
+
+        let x_offset = i as u32 * meso_map_res as u32;
+        let y_offset = j as u32 * meso_map_res as u32;
+
+        // Copy each image into the combined image at the correct position
+        combined_image.copy_from(&meso_map.low_res_dynamic_image, x_offset, y_offset).unwrap();
     }
-
-    let _ = image::save_buffer(
-        filename,
-        &result,
-        width as u32,
-        height as u32,
-        image::ColorType::Rgba8,
-    );
+    combined_image.save(filename).unwrap();
 }
 
 pub fn div_rem<T: std::ops::Div<Output=T> + std::ops::Rem<Output=T> + Copy>(x: T, y: T) -> (T, T) {

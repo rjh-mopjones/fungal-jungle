@@ -1,6 +1,7 @@
 use bevy::prelude::LinearRgba;
 use std::default::Default;
 use bevy::color::palettes::css::{WHEAT, WHITE};
+use bevy::diagnostic::{EntityCountDiagnosticsPlugin, FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::prelude::Name;
 use bevy::input::common_conditions::input_toggle_active;
 use bevy::prelude::*;
@@ -9,10 +10,10 @@ use bevy_ecs_tilemap::map::{TilemapId, TilemapTexture, TilemapType};
 use bevy_ecs_tilemap::prelude::*;
 use bevy_ecs_tilemap::{TilemapBundle, TilemapPlugin};
 use bevy::prelude::Color as OtherColor;
+use bevy::window::{PresentMode, WindowTheme};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
-use image::imageops::FilterType;
 use crate::engine::pancam::lib::{PanCam, PanCamPlugin};
-use crate::macro_map::macro_map::{write_meso_map_to_file};
+use crate::macro_map::macro_map::{write_macro_map_to_file, write_meso_map_to_file};
 
 pub mod jungle_noise;
 mod macro_map;
@@ -26,9 +27,10 @@ const TILE_H: usize = 10;
 const MAP_HEIGHT: usize = 512;
 const MAP_WIDTH: usize = 1024;
 
-static mut SCROLL_LEVEL: f32 = 0.0;
-//WINDOW
-
+const MESO_LOW_RES_PIXELS: usize = 16;
+// 32 for meso map size
+// 256 for micro map size but purps out at 64
+const DETAIL_FACTOR: usize = 32;
 
 #[derive(Resource)]
 pub struct CursorPos(Vec2);
@@ -53,8 +55,8 @@ fn setup(
             grab_buttons: vec![MouseButton::Left, MouseButton::Middle], // which buttons should drag the camera
             enabled: true, // when false, controls are disabled. See toggle example.
             zoom_to_cursor: true, // whether to zoom towards the mouse or the center of the screen
-            min_scale: 0.25, // prevent the camera from zooming too far in
-            max_scale: Some(2.5), // prevent the camera from zooming too far out
+            min_scale: 0.10, // prevent the camera from zooming too far in
+            max_scale: Some(10.0), // prevent the camera from zooming too far out
             ..default()
         });
     render_terrain(
@@ -117,10 +119,11 @@ fn render_terrain(mut commands: &mut Commands,
                   asset_server: Res<AssetServer>,
                   mut images: ResMut<Assets<Image>>
 ) {
-    let macro_map = jungle_noise::tidal::generate_in_house_tidal_noise(MAP_WIDTH, MAP_HEIGHT, 42);
+    let macro_map = jungle_noise::tidal::generate_in_house_tidal_noise(MAP_WIDTH, MAP_HEIGHT, DETAIL_FACTOR, 42);
     write_meso_map_to_file(macro_map.clone(), 10, "meso-map.png");
+    // write_macro_map_to_file(macro_map.clone(), "macro-map.png");
     let macro_map_entity = commands.spawn(Name::new("MacroMap")).id();
-    let map_size = TilemapSize { x: (MAP_WIDTH / 16) as u32, y: (MAP_HEIGHT / 16) as u32 };
+    let map_size = TilemapSize { x: (MAP_WIDTH / MESO_LOW_RES_PIXELS) as u32, y: (MAP_HEIGHT / MESO_LOW_RES_PIXELS) as u32 };
 
     let mut tile_storage = TileStorage::empty(map_size);
     let mut meso_map_images: Vec<Handle<Image>> = vec![];
@@ -141,12 +144,11 @@ fn render_terrain(mut commands: &mut Commands,
 
         meso_map_images.push(images.add(
             Image::from_dynamic(meso_map.low_res_dynamic_image.clone()
-                                    .fliph()
-                                    .resize(64, 64, FilterType::Nearest),false, RenderAssetUsages::default())
+                                    .fliph(),false, RenderAssetUsages::default())
         ));
     }
 
-    let tile_size = TilemapTileSize { x: 64.0, y: 64.0 };
+    let tile_size = TilemapTileSize { x: (MESO_LOW_RES_PIXELS * DETAIL_FACTOR) as f32, y: (MESO_LOW_RES_PIXELS * DETAIL_FACTOR) as f32};
     let grid_size = tile_size.into();
     let map_type = TilemapType::Square;
 
@@ -162,16 +164,37 @@ fn render_terrain(mut commands: &mut Commands,
     }).push_children(&*meso_map_entites);
 }
 
+fn count_entities(world: &mut World) {
+    println!("Entites {}", world.entities().total_count());
+}
+
+// create macromap camera where we reach threshold where generate meso, and slap a toggle on them
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins
-            .set(ImagePlugin::default_nearest())
-        )
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                title: "Fungal Jungle".into(),
+                name: Some("bevy.app".into()),
+                resolution: (2048., 1024.).into(),
+                present_mode: PresentMode::AutoVsync,
+                fit_canvas_to_parent: true,
+                prevent_default_event_handling: false,
+                window_theme: Some(WindowTheme::Dark),
+                enabled_buttons: bevy::window::EnabledButtons {
+                    maximize: true,
+                    ..Default::default()
+                },
+                visible: true,
+                ..default()
+            }),
+            ..default()
+        }).set(ImagePlugin::default_nearest()))
         .add_plugins(PanCamPlugin)
-        .add_plugins(WorldInspectorPlugin::default().run_if(input_toggle_active(true, KeyCode::Escape)))
+        .add_plugins(WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::Escape)))
         .add_plugins(TilemapPlugin)
-        // .add_plugins(FrameTimeDiagnosticsPlugin)
-        // .add_plugins(LogDiagnosticsPlugin::default())
+        .add_plugins(LogDiagnosticsPlugin::default())
+        .add_plugins(FrameTimeDiagnosticsPlugin::default())
+        .add_plugins(EntityCountDiagnosticsPlugin::default())
         .init_resource::<CursorPos>()
         .add_systems(Startup, setup)
         .add_systems(First, update_cursor_pos)
