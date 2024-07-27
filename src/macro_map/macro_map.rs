@@ -5,6 +5,7 @@ use rayon::iter::plumbing::{bridge, Consumer, Producer, ProducerCallback, Uninde
 use rayon::prelude::*;
 use crate::macro_map::tile::Tile;
 use image::{DynamicImage, GenericImage, ImageBuffer, RgbImage}; use bevy::prelude::*;
+use crate::jungle_noise::generator::Generator;
 
 
 const MESO_LOW_RES_PIXELS: usize = 16;
@@ -116,9 +117,16 @@ impl<'a> IntoParallelIterator for &'a MacroMap{
     }
 }
 
-pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<3> + Sync>(sea_level: f64, width: usize,
-                                                                           height:usize, zoom: usize,
-                                                                           centre: (f64, f64), generator: &G) -> MacroMap {
+pub fn generate_macro_map(width: usize, height:usize, zoom: usize, seed: u64, grayscale: bool) -> MacroMap {
+
+    const CONTINENT_FREQUENCY: f64 = 1.00;
+    const CONTINENT_LACUNARITY: f64 = 2.00;
+    const SEA_LEVEL: f64 = -0.025;
+
+    // Do fbm perlin for base continent def
+    let generator = crate::jungle_noise::source::Source::<3>::improved_perlin(seed).scale([0.01; 3])
+        .fbm(16, CONTINENT_FREQUENCY, CONTINENT_LACUNARITY, 0.59);
+
 
     let now = Instant::now();
 
@@ -127,7 +135,7 @@ pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<3> + Sync
     let total_meso_tiles = MESO_LOW_RES_PIXELS * MESO_LOW_RES_PIXELS;
 
     let blank_tile = MacroMapTile {
-        tile: Tile::Blank,
+        tile: Tile::Black,
         temperature: 0.0,
         height: 0.0,
         coords:(0.0,0.0)
@@ -173,10 +181,7 @@ pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<3> + Sync
                         let mut sample: f64 = generator.sample([global_x + x_extent, global_y+y_extent, 1.0]);
                         let mut m_temperature: f64 = ((((global_y+y_extent)/ height as f64) * 150.0) - 50.0)
                             + 100.0 * generator.sample([global_x+x_extent, global_y+y_extent, 1.1]);
-                        let mut m_tile = create_tile(sea_level, sample, m_temperature);
-                        // img.put_pixel(local_x as u32, MESO_LOW_RES_PIXELS as u32 - local_y as u32 - 1u32, m_tile.rbg_colour());
-                        // let x_pixel = MESO_LOW_RES_PIXELS as u32 * zoom as u32 - local_x as u32 - step as u32 - 1u32;
-                        // let y_pixel = local_y as u32 + step as u32;
+                        let mut m_tile = create_tile(SEA_LEVEL, sample, m_temperature);
                         let x_pixel = MESO_LOW_RES_PIXELS as u32 * zoom as u32 - zoomed_x as u32 - x_step as u32 - 1u32;
                         let y_pixel = zoomed_y as u32 + y_step as u32;
 
@@ -210,7 +215,7 @@ pub fn generate_macro_map<G: crate::jungle_noise::generator::Generator<3> + Sync
 fn create_tile(sea_level: f64, sample: f64, temperature: f64) -> Tile {
     return if sample < sea_level {
         if temperature < -15.0 {
-            Tile::Ice
+            Tile::White
         } else if temperature > 50.0 {
             Tile::Desert
         } else {

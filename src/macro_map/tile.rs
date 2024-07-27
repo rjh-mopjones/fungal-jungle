@@ -5,7 +5,7 @@ use image::Rgb;
 pub enum Tile {
     #[default]
     Sea,
-    Ice,
+    White,
     Snow,
     Jungle,
     Mountain,
@@ -15,7 +15,7 @@ pub enum Tile {
     Plateau,
     Sahara,
     Beach,
-    Blank,
+    Black
 }
 
 impl Tile{
@@ -23,7 +23,7 @@ impl Tile{
         match *self {
             Tile::Sea => 0,
             Tile::Plains => 1,
-            Tile::Ice => 2,
+            Tile::White => 2,
             Tile::Snow => 3,
             Tile::Forest=> 4,
             Tile::Desert=> 5,
@@ -41,7 +41,7 @@ impl Tile{
         match *self {
             Tile::Sea =>[0,191,255,255] ,
             Tile::Plains => [50, 205, 50, 255],
-            Tile::Ice => [255, 255, 255, 255],
+            Tile::White => [255, 255, 255, 255],
             Tile::Snow => [211,211,211, 255],
             Tile::Forest=> [0, 100, 0, 255],
             Tile::Desert=> [255,215,0, 255],
@@ -59,7 +59,7 @@ impl Tile{
         match *self {
             Tile::Sea =>Rgb([0,191,255]),
             Tile::Plains => Rgb([50, 205, 50]),
-            Tile::Ice => Rgb([255, 255, 255]),
+            Tile::White => Rgb([255, 255, 255]),
             Tile::Snow => Rgb([211,211,211]),
             Tile::Forest=> Rgb([0, 100, 0]),
             Tile::Desert=> Rgb([255,215,0]),

@@ -13,7 +13,7 @@ use bevy::prelude::Color as OtherColor;
 use bevy::window::{PresentMode, WindowTheme};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use crate::engine::pancam::lib::{PanCam, PanCamPlugin};
-use crate::macro_map::macro_map::{write_macro_map_to_file, write_meso_map_to_file};
+use crate::macro_map::macro_map::{generate_macro_map, write_macro_map_to_file, write_meso_map_to_file};
 
 pub mod jungle_noise;
 mod macro_map;
@@ -56,7 +56,7 @@ fn setup(
             enabled: true, // when false, controls are disabled. See toggle example.
             zoom_to_cursor: true, // whether to zoom towards the mouse or the center of the screen
             min_scale: 0.10, // prevent the camera from zooming too far in
-            max_scale: Some(10.0), // prevent the camera from zooming too far out
+            max_scale: Some(25.0), // prevent the camera from zooming too far out
             ..default()
         });
     render_terrain(
@@ -119,7 +119,7 @@ fn render_terrain(mut commands: &mut Commands,
                   asset_server: Res<AssetServer>,
                   mut images: ResMut<Assets<Image>>
 ) {
-    let macro_map = jungle_noise::tidal::generate_in_house_tidal_noise(MAP_WIDTH, MAP_HEIGHT, DETAIL_FACTOR, 42);
+    let macro_map = generate_macro_map(MAP_WIDTH, MAP_HEIGHT, DETAIL_FACTOR, 42, false);
     write_meso_map_to_file(macro_map.clone(), 10, "meso-map.png");
     // write_macro_map_to_file(macro_map.clone(), "macro-map.png");
     let macro_map_entity = commands.spawn(Name::new("MacroMap")).id();
@@ -162,10 +162,6 @@ fn render_terrain(mut commands: &mut Commands,
         transform: get_tilemap_center_transform(&map_size, &grid_size, &map_type, 0.0),
         ..Default::default()
     }).push_children(&*meso_map_entites);
-}
-
-fn count_entities(world: &mut World) {
-    println!("Entites {}", world.entities().total_count());
 }
 
 // create macromap camera where we reach threshold where generate meso, and slap a toggle on them
