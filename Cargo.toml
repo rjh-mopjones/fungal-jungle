@@ -14,7 +14,7 @@ num-traits = "0.2.19"
 rand_chacha = "0.3.1"
 rand = "0.8.5"
 rayon = "1.10.0"
-bevy = "0.14.0"
+bevy = "0.14.2"
 regex = "1.10.5"
 bevy_ecs_tilemap = { git = "https://github.com/StarArawn/bevy_ecs_tilemap.git" }
 bevy-inspector-egui = "0.25.1"

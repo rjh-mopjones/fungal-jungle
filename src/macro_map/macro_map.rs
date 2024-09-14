@@ -108,7 +108,7 @@ impl MacroMap {
     }
 }
 
-impl<'a> IntoParallelIterator for &'a MacroMap{
+impl<'a> IntoParallelIterator for &'a MacroMap {
     type Iter = ParDataIter<'a>;
     type Item = &'a MesoMap;
 
@@ -118,6 +118,11 @@ impl<'a> IntoParallelIterator for &'a MacroMap{
 }
 
 pub fn generate_macro_map(width: usize, height:usize, zoom: usize, seed: u64, grayscale: bool) -> MacroMap {
+    // in minecraft this is done by generating 5 perlin noise functions
+    // Continentalness, Erosion, Peaks and Valleys, Temperature, Humidity
+    // also we will want to add two more: Plates and Resources
+    // ideally we have a hashmap with these generators in, or even pre generate them
+    // then we can pass this to the macromap which does the combining of the generators
 
     const CONTINENT_FREQUENCY: f64 = 1.00;
     const CONTINENT_LACUNARITY: f64 = 2.00;
