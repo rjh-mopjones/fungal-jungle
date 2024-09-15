@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 
-pub mod jungle_noise;
 mod macro_map;
 mod engine;
 mod game;

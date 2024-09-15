@@ -1,2 +1,3 @@
-pub mod macro_map;
-mod tile;
+pub(crate) mod tiling_strategy;
+pub mod macromap;
+pub mod jungle_noise;
