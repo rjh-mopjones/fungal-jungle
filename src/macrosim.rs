@@ -1,16 +1,15 @@
-use bevy::app::{App, Startup, Update};
-use bevy::asset::{Assets, AssetServer, Handle};
+use bevy::app::{App, Update};
 use bevy::color::LinearRgba;
 use bevy::color::palettes::basic::WHITE;
 use bevy::color::palettes::css::WHEAT;
-use bevy::core::Name;
+use bevy::input::ButtonInput;
 use bevy::math::{Vec2, Vec4};
-use bevy::prelude::{BuildChildren, Camera, Camera2dBundle, Commands, Component, CursorMoved, default, Entity, EventReader, GlobalTransform, Image, MouseButton, Query, Res, ResMut, Resource, Transform, Vec4Swizzles, With};
-use bevy::render::render_asset::RenderAssetUsages;
+use bevy::prelude::{Camera, Commands, Component, CursorMoved, Entity, EventReader, GlobalTransform, KeyCode, Query, Res, ResMut, Resource, Transform, Vec4Swizzles, With};
 use bevy::prelude::Color as OtherColor;
-use bevy_ecs_tilemap::map::{TilemapGridSize, TilemapId, TilemapSize, TilemapTexture, TilemapTileSize, TilemapType};
-use bevy_ecs_tilemap::prelude::{get_tilemap_center_transform, TileBundle, TileColor, TilePos, TileStorage, TileTextureIndex};
-use bevy_ecs_tilemap::{TilemapBundle, TilemapPlugin};
+use bevy_ecs_tilemap::map::{TilemapGridSize, TilemapSize, TilemapTexture, TilemapType};
+use bevy_ecs_tilemap::prelude::{TileColor, TilePos, TileStorage};
+use bevy_ecs_tilemap::{TilemapPlugin};
+use crate::macro_map::macromap::{CurrentLayer, MacroLayerTextures};
 
 const SPRITE_SHEET_PATH: &str = "sprite-sheet.png";
 const SPRITE_SCALE_FACTOR: usize = 10;
@@ -84,11 +83,30 @@ fn highlight_tile(mut commands: Commands,
         }
     }
 }
+fn switch_layer(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut query: Query<(&mut CurrentLayer, &mut TilemapTexture, &mut MacroLayerTextures)>,
+) {
+    if keyboard_input.just_pressed(KeyCode::Space) {
+        for (mut current_layer, mut tilemap_texture, macrolayer_textures) in &mut query {
+            if current_layer.layer == "default" {
+                current_layer.layer = "temperature".parse().unwrap();
+                println!("{}", current_layer.layer);
+                *tilemap_texture = macrolayer_textures.temperature.clone();
+            } else{
+                current_layer.layer = "default".parse().unwrap();
+                println!("{}", current_layer.layer);
+                *tilemap_texture = macrolayer_textures.aggregate.clone();
+            }
+        }
+    }
+}
 
 pub(super) fn plugin(app: &mut App) {
     app.add_plugins(TilemapPlugin)
        .add_plugins(crate::macro_map::macromap::plugin)
        .init_resource::<CursorPos>()
        .add_systems(Update, update_cursor_pos)
-       .add_systems(Update, highlight_tile);
+       .add_systems(Update, highlight_tile)
+       .add_systems(Update, switch_layer);
 }

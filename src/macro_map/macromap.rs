@@ -4,11 +4,11 @@ use bevy::asset::{Assets, Handle};
 use bevy::core::Name;
 use bevy::hierarchy::BuildChildren;
 use bevy::math::{vec2, Vec2};
-use bevy::prelude::{Commands, default, Entity, Image, ResMut};
+use bevy::prelude::{Bundle, Commands, Component, default, Entity, GlobalTransform, Image, InheritedVisibility, ResMut, Transform, ViewVisibility, Visibility};
 use bevy::render::render_asset::RenderAssetUsages;
-use bevy_ecs_tilemap::map::{TilemapId, TilemapSize, TilemapTexture, TilemapTileSize, TilemapType};
-use bevy_ecs_tilemap::prelude::{get_tilemap_center_transform, TileBundle, TilePos, TileStorage, TileTextureIndex};
-use bevy_ecs_tilemap::TilemapBundle;
+use bevy_ecs_tilemap::map::{TilemapGridSize, TilemapId, TilemapRenderSettings, TilemapSize, TilemapSpacing, TilemapTexture, TilemapTileSize, TilemapType};
+use bevy_ecs_tilemap::prelude::{get_tilemap_center_transform, MaterialTilemap, StandardTilemapMaterial, TileBundle, TileColor, TileFlip, TilePos, TilePosOld, TileStorage, TileTextureIndex, TileVisible};
+use bevy_ecs_tilemap::{FrustumCulling, TilemapBundle};
 use image::{DynamicImage, ImageBuffer, Rgb, RgbImage};
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use rayon::iter::plumbing::{bridge, Consumer, Producer, ProducerCallback, UnindexedConsumer};
@@ -37,12 +37,15 @@ pub struct TileLayer {
     pub(crate) temperature: f64,
     pub(crate) humidity: f64,
     pub(crate) altitude: f64,
-    pub(crate) resources: f64
+    pub(crate) resources: f64,
+    pub(crate) wind: f64
 }
 
 #[derive(Default, Clone, Debug)]
 pub struct MesoLayerImages {
+    pub(crate) aggregate: DynamicImage,
     pub(crate) continentalness: DynamicImage,
+    pub(crate) wind: DynamicImage,
     pub(crate) erosion: DynamicImage,
     pub(crate) peaks_and_valleys: DynamicImage,
     pub(crate) temperature: DynamicImage,
@@ -51,9 +54,22 @@ pub struct MesoLayerImages {
     pub(crate) resources: DynamicImage,
 }
 
+#[derive(Component, Default, Clone, Debug)]
+pub struct MacroLayerTextures {
+    pub(crate) aggregate: TilemapTexture,
+    // pub(crate) continentalness: TilemapTexture,
+    // pub(crate) erosion: Vec<Handle<Image>>,
+    // pub(crate) peaks_and_valleys: Vec<Handle<Image>>,
+    pub(crate) temperature: TilemapTexture,
+    // pub(crate) humidity: Vec<Handle<Image>>,
+    // pub(crate) altitude: Vec<Handle<Image>>,
+    // pub(crate) wind: Vec<Handle<Image>>,
+    // pub(crate) resources: Vec<Handle<Image>>,
+}
+
 #[derive(Default, Clone, Debug)]
 pub struct Tile {
-    // Continentalness, Erosion, Peaks and Valleys, Temperature, Humidity
+    // Continentalness, Erosion, Peaks and Valleys, Temperature, Humidity, Wind
     // also we will want to add two more: Altitude (plates) and Resources
     pub(crate) tile_type: TileType,
     pub(crate) layer: TileLayer,
@@ -70,6 +86,45 @@ pub struct MesoMap {
     pub(crate) layer_images: MesoLayerImages
 }
 
+#[derive(Bundle, Debug, Default, Clone)]
+pub struct MacroTilemap<M: MaterialTilemap> {
+    pub grid_size: TilemapGridSize,
+    pub map_type: TilemapType,
+    pub size: TilemapSize,
+    pub spacing: TilemapSpacing,
+    pub storage: TileStorage,
+    pub texture: TilemapTexture,
+    pub tile_size: TilemapTileSize,
+    pub transform: Transform,
+    pub global_transform: GlobalTransform,
+    pub render_settings: TilemapRenderSettings,
+    /// User indication of whether an entity is visible
+    pub visibility: Visibility,
+    /// Algorithmically-computed indication of whether an entity is visible and should be extracted
+    /// for rendering
+    pub inherited_visibility: InheritedVisibility,
+    pub view_visibility: ViewVisibility,
+    /// User indication of whether tilemap should be frustum culled.
+    pub frustum_culling: FrustumCulling,
+    pub material: Handle<M>,
+    pub layers: MacroLayerTextures,
+    // pub meso_map: MesoMap,
+    pub current_layer: CurrentLayer
+}
+
+#[derive(Bundle, Debug, Default, Clone)]
+pub struct MesoTileBundle {
+    pub position: TilePos,
+    pub texture_index: TileTextureIndex,
+    pub tilemap_id: TilemapId,
+    pub visible: TileVisible,
+    pub flip: TileFlip,
+    pub color: TileColor,
+    pub old_position: TilePosOld,
+}
+
+pub type MacroTilemapBundle = MacroTilemap<StandardTilemapMaterial>;
+
 #[derive(Clone, Debug)]
 pub struct Generators {
     pub(crate) continentalness:  jungle_noise::adapters::Fbm<3, jungle_noise::adapters::Scale<3, jungle_noise::sources::ImprovedPerlin<3>>>,
@@ -78,6 +133,7 @@ pub struct Generators {
     pub(crate) temperature:  jungle_noise::adapters::Fbm<3, jungle_noise::adapters::Scale<3, jungle_noise::sources::ImprovedPerlin<3>>>
     // pub(crate) humidity: dyn jungle_noise::generator::Generator3D,
     // pub(crate) altitude: dyn jungle_noise::generator::Generator3D,
+    // pub(crate) wind: dyn jungle_noise::generator::Generator3D,
     // pub(crate) resources: dyn jungle_noise::generator::Generator3D,
 }
 
@@ -89,9 +145,15 @@ pub struct MacroMap {
     pub(crate) generators: Generators
 }
 
+#[derive(Component, Clone, Debug, Default)]
+pub struct CurrentLayer {
+    pub layer: String
+}
+
 pub struct ParDataIter<'a> {
     data_slice: &'a [MesoMap]
 }
+
 struct DataProducer<'a> {
     data_slice : &'a [MesoMap],
 }
@@ -107,7 +169,8 @@ impl<'a> ParallelIterator for ParDataIter<'a> {
 
     fn opt_len(&self) -> Option<usize> {
         Some(self.len())
-    }}
+    }
+}
 
 impl<'a> IndexedParallelIterator for ParDataIter<'a> {
     fn len(&self) -> usize {
@@ -223,6 +286,7 @@ fn create_macro_map(
                             humidity: 0.0,
                             altitude: 0.0,
                             resources: 0.0,
+                            wind: 0.0
                         };
 
                         let mut tile_type = crate::macro_map::tiling_strategy::get_tile(SEA_LEVEL, tile_layer);
@@ -245,15 +309,16 @@ fn create_macro_map(
                 }
             }
             new_meso_map.layer_images = MesoLayerImages {
+                aggregate: DynamicImage::from(meso_image).to_rgba8().into(),
                 continentalness: DynamicImage::from(continentalness_img).to_rgba8().into(),
                 erosion: Default::default(),
                 peaks_and_valleys: Default::default(),
                 temperature: DynamicImage::from(temperature_img).to_rgba8().into(),
                 humidity: Default::default(),
                 altitude: Default::default(),
+                wind: Default::default(),
                 resources: Default::default()
             };
-            new_meso_map.image = DynamicImage::from(meso_image);
             return new_meso_map;
         }).collect();
 
@@ -274,40 +339,52 @@ fn create_macro_map(
     let map_size = TilemapSize { x: (MAP_WIDTH / MESO_LOW_RES_PIXELS) as u32, y: (MAP_HEIGHT / MESO_LOW_RES_PIXELS) as u32 };
 
     let mut tile_storage = TileStorage::empty(map_size);
-    let mut meso_map_images: Vec<Handle<Image>> = vec![];
+    let mut layer_images: MacroLayerTextures = Default::default();
     let mut meso_map_entites: Vec<Entity> = vec![];
+
+    let mut aggregate_handle: Vec<Handle<Image>> = vec![];
+    let mut temperature_handle: Vec<Handle<Image>> = vec![];
 
     for (i, meso_map) in macromap.meso_maps.iter().enumerate() {
         let tile_pos = TilePos { x: meso_map.index.x as u32, y: map_size.y - 1 - meso_map.index.y as u32};
         let tile_entity = commands
-            .spawn((TileBundle {
+            .spawn((MesoTileBundle {
                 position: tile_pos,
                 texture_index: TileTextureIndex(i as u32),
                 tilemap_id: TilemapId(macro_map_entity),
                 ..Default::default()
-            }, Name::new(format!("MesoMap{}",meso_map.index))))
+            }, Name::new(format!("MesoMap{}", meso_map.index))))
             .id();
         meso_map_entites.push(tile_entity);
         tile_storage.set(&tile_pos, tile_entity);
 
-        meso_map_images.push(images.add(
-            Image::from_dynamic(meso_map.image.clone()
-                                    .fliph(),false, RenderAssetUsages::default())
-        ));
+        aggregate_handle.push(images.add(Image::from_dynamic(meso_map.layer_images.aggregate.clone().fliph(),false, RenderAssetUsages::default())));
+        // layer_images.altitude.push(images.add(Image::from_dynamic(meso_map.layer_images.altitude.clone().fliph(),false, RenderAssetUsages::default())));
+        // layer_images.continentalness.push(images.add(Image::from_dynamic(meso_map.layer_images.continentalness.clone().fliph(),false, RenderAssetUsages::default())));
+        // layer_images.erosion.push(images.add(Image::from_dynamic(meso_map.layer_images.erosion.clone().fliph(),false, RenderAssetUsages::default())));
+        temperature_handle.push(images.add(Image::from_dynamic(meso_map.layer_images.temperature.clone().fliph(),false, RenderAssetUsages::default())));
+        // layer_images.humidity.push(images.add(Image::from_dynamic(meso_map.layer_images.humidity.clone().fliph(),false, RenderAssetUsages::default())));
+        // layer_images.peaks_and_valleys.push(images.add(Image::from_dynamic(meso_map.layer_images.peaks_and_valleys.clone().fliph(),false, RenderAssetUsages::default())));
+        // layer_images.resources.push(images.add(Image::from_dynamic(meso_map.layer_images.resources.clone().fliph(),false, RenderAssetUsages::default())));
+        // layer_images.wind.push(images.add(Image::from_dynamic(meso_map.layer_images.wind.clone().fliph(),false, RenderAssetUsages::default())));
     }
+    layer_images.temperature = TilemapTexture::Vector(temperature_handle);
+    layer_images.aggregate= TilemapTexture::Vector(aggregate_handle);
 
     let tile_size = TilemapTileSize { x: (MESO_LOW_RES_PIXELS * DETAIL_FACTOR) as f32, y: (MESO_LOW_RES_PIXELS * DETAIL_FACTOR) as f32};
     let grid_size = tile_size.into();
     let map_type = TilemapType::Square;
 
-    commands.entity(macro_map_entity).insert(TilemapBundle {
+    commands.entity(macro_map_entity).insert(MacroTilemapBundle {
         grid_size,
         map_type,
         size: map_size,
-        texture: TilemapTexture::Vector(meso_map_images),
+        texture: layer_images.aggregate.clone(),
+        layers: layer_images,
         storage: tile_storage,
         tile_size,
         transform: get_tilemap_center_transform(&map_size, &grid_size, &map_type, 0.0),
+        current_layer: CurrentLayer{layer: "default".parse().unwrap()},
         ..Default::default()
     }).push_children(&*meso_map_entites);
 
