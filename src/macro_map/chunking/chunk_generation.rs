@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::time::SystemTime;
-use crate::macro_map::chunking::noise_layers::{NoiseStrategies, NoiseStrategy, NoiseValues};
+use crate::macro_map::chunking::noise_layers::{NoiseLayers, NoiseStrategies, NoiseStrategy, NoiseValues};
+use crate::macro_map::chunking::tiling::TilingStrategy;
 
 #[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
 pub struct ChunkCoord {
@@ -12,7 +13,8 @@ pub struct MesoChunk {
     coord: ChunkCoord,
     size: usize,
     noise_values: Vec<NoiseValues>,
-    last_accessed: SystemTime,
+    noise_layers: NoiseLayers,
+    last_accessed: SystemTime
 }
 
 impl MesoChunk {
@@ -21,6 +23,7 @@ impl MesoChunk {
             coord,
             size: 64, // Medium detail
             noise_values: vec![NoiseValues::default(); 32 * 32],
+            noise_layers: NoiseLayers::default(),
             last_accessed: SystemTime::now(),
         }
     }
@@ -58,7 +61,8 @@ pub struct MacroChunk {
     last_accessed: SystemTime,
     meso_cache: HashMap<ChunkCoord, MesoChunk>,
     max_meso_chunks: usize,
-    noise_values: Vec<NoiseValues>
+    noise_values: Vec<NoiseValues>,
+    noise_layers: NoiseLayers,
 }
 
 impl MacroChunk {
@@ -67,9 +71,10 @@ impl MacroChunk {
             coord,
             size: 32, // Low detail
             noise_values: vec![NoiseValues::default(); 32 * 32],
+            noise_layers: NoiseLayers::default(),
             last_accessed: SystemTime::now(),
             meso_cache: HashMap::new(),
-            max_meso_chunks: 16,
+            max_meso_chunks: 128,
         }
     }
 
@@ -127,16 +132,19 @@ pub struct WorldChunks {
     macro_chunks: HashMap<ChunkCoord, MacroChunk>,
     max_macro_chunks: usize,
     noise_strategies: NoiseStrategies,
+    tiling_strategy: TilingStrategy
 }
 
 impl WorldChunks {
     pub fn new(
                noise_strategies: NoiseStrategies,
+               tiling_strategy: TilingStrategy,
                max_macro_chunks: usize) -> Self {
         Self {
             macro_chunks: HashMap::new(),
             max_macro_chunks,
-            noise_strategies
+            noise_strategies,
+            tiling_strategy
         }
     }
 
