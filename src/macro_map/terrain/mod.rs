@@ -1,3 +1,3 @@
-pub mod chunk_generation;
+pub mod terrain_chunks;
 pub mod noise_layers;
 mod tiling;

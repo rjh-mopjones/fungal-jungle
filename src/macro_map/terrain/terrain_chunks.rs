@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::time::SystemTime;
-use crate::macro_map::chunking::noise_layers::{NoiseLayers, NoiseStrategies, NoiseStrategy, NoiseValues};
-use crate::macro_map::chunking::tiling::TilingStrategy;
+use crate::macro_map::terrain::noise_layers::{NoiseLayers, NoiseStrategies, NoiseStrategy, NoiseValues};
+use crate::macro_map::terrain::tiling::TilingStrategy;
 
 #[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
 pub struct ChunkCoord {
@@ -41,7 +41,7 @@ impl MesoChunk {
 
                 let index = y * self.size + x;
                 self.noise_values[index] = noise_strategies.generate(world_x, world_y, 0);
-}
+            }
         }
     }
 
@@ -128,21 +128,44 @@ impl MacroChunk {
     }
 }
 
+pub struct ChunkingConfig {
+    pub macro_chunk_size: usize,
+    pub meso_chunk_size: usize,
+    pub map_width: usize,
+    pub map_height: usize
+}
+
 pub struct WorldChunks {
     macro_chunks: HashMap<ChunkCoord, MacroChunk>,
-    max_macro_chunks: usize,
     noise_strategies: NoiseStrategies,
-    tiling_strategy: TilingStrategy
+    tiling_strategy: TilingStrategy,
+    chunking_config: ChunkingConfig
 }
 
 impl WorldChunks {
     pub fn new(
                noise_strategies: NoiseStrategies,
                tiling_strategy: TilingStrategy,
-               max_macro_chunks: usize) -> Self {
+               chunking_config: ChunkingConfig) -> Self {
+        let chunks_y = chunking_config.map_height / chunking_config.macro_chunk_size;
+        let chunks_x = chunking_config.map_width / chunking_config.macro_chunk_size;
+        let world_x = 0;
+        let mut world_y = 0;
+
+        for y in 0..chunks_y {
+            for x in 0..chunks_x {
+                let world_x = self.coord.x as f64 + x as f64 / self.size as f64;
+                let world_y = self.coord.y as f64 + y as f64 / self.size as f64;
+
+                let index = y * self.size + x;
+                self.noise_values[index] = noise_strategies.generate(world_x, world_y, 0);
+            }
+            world_y = world_y + chunking_config.macro_chunk_size
+        }
+
         Self {
             macro_chunks: HashMap::new(),
-            max_macro_chunks,
+            chunking_config,
             noise_strategies,
             tiling_strategy
         }
