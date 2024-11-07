@@ -1,4 +1,5 @@
 use image::Rgb;
+use crate::macro_map::terrain::noise_layers::NoiseValues;
 
 #[derive(Debug, Clone, Copy)]
 pub struct ThresholdRange {
@@ -38,7 +39,6 @@ pub struct TileThresholds {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tile {
-    #[default]
     Sea,
     White,
     Snow,
@@ -185,13 +185,20 @@ pub struct TilingStrategy {
 }
 
 impl TilingStrategy {
+    pub(crate) fn get_grayscale_tile(&self, noise: f64) -> Rgb<u8> {
+        let value = (noise * 255f64) as u8;
+        Rgb([value, value, value])
+    }
+}
+
+impl TilingStrategy {
     pub fn new(config: TilingConfig) -> Self {
         Self { config }
     }
 
-    pub fn get_tile(&self, altitude: f64, temp: f64, cont: f64) -> Tile {
+    pub fn get_tile(&self, noise_values: &NoiseValues) -> Tile {
         Tile::all().into_iter()
-            .find(|tile| tile.matches(&self.config, altitude, temp, cont))
+            .find(|tile| tile.matches(&self.config, noise_values.altitude, noise_values.temperature, noise_values.continentalness))
             .unwrap_or(Tile::Black)
     }
 }

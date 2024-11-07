@@ -1,19 +1,29 @@
-use bevy::asset::Handle;
-use bevy::prelude::Image;
+use image::{DynamicImage, GenericImage, Pixel};
 use noise::{NoiseFn, OpenSimplex};
+use crate::macro_map::terrain::tiling::TilingStrategy;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct NoiseValues {
-    continentalness: f64,
-    temperature: f64,
-    altitude: f64
+    pub(crate) continentalness: f64,
+    pub(crate) temperature: f64,
+    pub(crate) altitude: f64
 }
 
 #[derive(Default)]
 pub struct NoiseLayers {
-    continentalness: Handle<Image>,
-    temperature: Handle<Image>,
-    altitude: Handle<Image>
+    aggregate: DynamicImage,
+    continentalness: DynamicImage,
+    temperature: DynamicImage,
+    altitude: DynamicImage
+}
+
+impl NoiseLayers {
+    pub(crate) fn add_at_index(&mut self, x: usize, y: usize, noise_values: &NoiseValues, tiling_strategy: &TilingStrategy) {
+        self.aggregate.put_pixel(x as u32, y as u32, tiling_strategy.get_tile(noise_values).rbg_colour().to_rgba());
+        self.continentalness.put_pixel(x as u32, y as u32, tiling_strategy.get_grayscale_tile(noise_values.continentalness).to_rgba());
+        self.temperature.put_pixel(x as u32, y as u32, tiling_strategy.get_grayscale_tile(noise_values.temperature).to_rgba());
+        self.altitude.put_pixel(x as u32, y as u32, tiling_strategy.get_grayscale_tile(noise_values.altitude).to_rgba());
+    }
 }
 
 pub struct NoiseStrategies {
@@ -64,7 +74,7 @@ impl NoiseStrategy for AltitudeStrategy {
             let sample_x = x * frequency / self.scale;
             let sample_y = y * frequency / self.scale;
 
-            base_noise += self.get([sample_x, sample_y]) * amplitude;
+            base_noise += self.noise.get([sample_x, sample_y]) * amplitude;
             weight += amplitude;
 
             amplitude *= persistence;
