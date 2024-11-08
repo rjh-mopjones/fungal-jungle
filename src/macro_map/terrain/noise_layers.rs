@@ -11,10 +11,10 @@ pub struct NoiseValues {
 
 #[derive(Default)]
 pub struct NoiseLayers {
-    aggregate: DynamicImage,
-    continentalness: DynamicImage,
-    temperature: DynamicImage,
-    altitude: DynamicImage
+    pub(crate) aggregate: DynamicImage,
+    pub(crate) continentalness: DynamicImage,
+    pub(crate) temperature: DynamicImage,
+    pub(crate) altitude: DynamicImage
 }
 
 impl NoiseLayers {
