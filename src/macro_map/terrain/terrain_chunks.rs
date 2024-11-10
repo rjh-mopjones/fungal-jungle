@@ -8,9 +8,9 @@ use bevy::render::render_asset::RenderAssetUsages;
 use bevy_ecs_tilemap::FrustumCulling;
 use bevy_ecs_tilemap::map::{TilemapGridSize, TilemapId, TilemapRenderSettings, TilemapSize, TilemapSpacing, TilemapTexture, TilemapTileSize, TilemapType};
 use bevy_ecs_tilemap::prelude::{get_tilemap_center_transform, MaterialTilemap, StandardTilemapMaterial, TileColor, TileFlip, TilePos, TilePosOld, TileStorage, TileTextureIndex, TileVisible};
-use crate::macro_map::terrain::noise_layers::{NoiseLayers, NoiseStrategies, NoiseStrategy, NoiseValues};
+use crate::macro_map::terrain::noise_layers::{AltitudeStrategy, ContinentalnessStrategy, NoiseLayers, NoiseStrategies, NoiseStrategy, NoiseValues, TemperatureStrategy};
 use bevy::prelude::BuildChildren;
-use crate::macro_map::terrain::tiling::TilingStrategy;
+use crate::macro_map::terrain::tiling::{TilingConfig, TilingStrategy};
 
 #[derive(Clone, Copy, Hash, Eq, PartialEq, Debug, Default)]
 pub struct ChunkCoord {
@@ -41,7 +41,7 @@ impl WorldTextures {
         self.continentalness_handle.push(images.add(Image::from_dynamic(noise_layers.continentalness.fliph(),false, RenderAssetUsages::default())));
         self.altitude_handle.push(images.add(Image::from_dynamic(noise_layers.altitude.fliph(),false, RenderAssetUsages::default())));
     }
-    
+
     pub fn get_texture(&mut self, layer: &str ) -> TilemapTexture {
         match layer {
             "aggregate" => TilemapTexture::Vector(self.aggregate_handle.clone()),
@@ -51,50 +51,13 @@ impl WorldTextures {
             _ => TilemapTexture::Vector(self.aggregate_handle.clone()),
         }
     }
-    
-}
 
-pub struct MesoChunk {
-    coord: ChunkCoord,
-    size: usize,
-    noise_values: Vec<NoiseValues>,
-    noise_layers: NoiseLayers,
-    last_accessed: SystemTime
-}
-
-impl MesoChunk {
-    pub fn new(size: usize, coord: ChunkCoord, tiling_strategy: &TilingStrategy, noise_strategies: &NoiseStrategies) -> Self {
-        let mut noise_layers = NoiseLayers::default();
-        let mut noise_values = vec![NoiseValues::default(); size * size];
-
-        for y in 0..size {
-            for x in 0..size {
-                let world_x = coord.x as f64 + x as f64 / size as f64;
-                let world_y = coord.y as f64 + y as f64 / size as f64;
-
-                let index = y * size + x;
-                let current_noise_value = noise_strategies.generate(world_x, world_y, 1);
-                noise_layers.add_at_index(x, y, &current_noise_value, tiling_strategy);
-                noise_values[index] = current_noise_value;
-                noise_strategies.generate(world_x, world_y, 0);
-            }
-        }
-
-        Self {
-            coord,
-            size,
-            noise_values: vec![NoiseValues::default(); size * size],
-            noise_layers: NoiseLayers::default(),
-            last_accessed: SystemTime::now(),
-        }
-    }
 }
 
 #[derive(Component, Default)]
 pub struct MacroChunk {
     pub coord: ChunkCoord,
     pub size: usize,
-    pub meso_cache: HashMap<ChunkCoord, MesoChunk>,
     pub max_meso_chunks: usize,
     pub noise_values: Vec<NoiseValues>,
     pub noise_layers: NoiseLayers,
@@ -113,9 +76,9 @@ pub struct MacroChunkBundle {
 }
 
 impl MacroChunk {
-    pub fn new(size: usize, 
+    pub fn new(size: usize,
                 coord: ChunkCoord, tiling_strategy: &TilingStrategy, noise_strategies: &NoiseStrategies) -> Self {
-        let mut noise_layers = NoiseLayers::default();
+        let mut noise_layers = NoiseLayers::new(size);
         let mut noise_values = vec![NoiseValues::default(); size * size];
 
         for y in 0..size {
@@ -135,7 +98,6 @@ impl MacroChunk {
             size,
             noise_values,
             noise_layers,
-            meso_cache: HashMap::new(),
             max_meso_chunks: 128,
         }
     }
@@ -169,7 +131,7 @@ pub struct WorldTileMapBundle<M: MaterialTilemap> {
     pub inherited_visibility: InheritedVisibility,
     pub view_visibility: ViewVisibility,
     /// User indication of whether tilemap should be frustum culled.
-    pub frustum_culling: FrustumCulling,
+    pub frustum_culling: FrustumCulling ,
     pub material: Handle<M>,
     pub world_textures: WorldTextures,
 }
@@ -195,37 +157,40 @@ impl WorldChunks {
         let mut world_x = 0;
         let mut world_y = 0;
         let mut macro_chunk_entities: Vec<Entity> = vec![];
-        
+
         let world_chunks_entity = commands.spawn(Name::new("World_Chunks")).id();
         let mut world_textures : WorldTextures = Default::default();
         let map_size = TilemapSize { x: chunking_config.map_width as u32, y: chunking_config.map_height as u32 };
         let mut tile_storage = TileStorage::empty(map_size);
-        
+
+        println!("Creating {} chunks", chunks_x * chunks_y);
         for y in 0..chunks_y {
             for x in 0..chunks_x {
                 world_x = x * chunking_config.macro_chunk_size;
                 world_y = y * chunking_config.macro_chunk_size;
+                println!("On MacroChunk {} ", x + (chunks_y * y) );
                 let chunk_coord = ChunkCoord{x: (x * chunking_config.macro_chunk_size) as i32,
                                              y: (y * chunking_config.macro_chunk_size) as i32 };
 
-                let tile_pos = TilePos { x: chunk_coord.x as u32, y: (chunking_config.map_height - 1 - chunk_coord.y as usize) as u32 };
+                let tile_pos = TilePos { x: x as u32, y: y as u32 };
                 let macro_chunk = MacroChunk::new(chunking_config.macro_chunk_size, chunk_coord, &tiling_strategy, &noise_strategies);
                 world_textures.add_layer(&macro_chunk.noise_layers, &mut images);
-                
+
                 let macro_chunk_entity = commands.spawn((MacroChunkBundle {
-                    position: TilePos { x: world_x as u32, y: world_y as u32 },
-                    texture_index: TileTextureIndex((x + (y * x)) as u32),
+                    position: TilePos { x: x as u32, y: y as u32 },
+                    texture_index: TileTextureIndex((x + (chunks_y * y)) as u32),
                     tilemap_id: TilemapId(world_chunks_entity),
                     macro_chunk,
                     ..Default::default()
                 }, Name::new(format!("MacroChunk(x:{},y:{})",x, y)))).id();
-                
+
                 macro_chunk_entities.insert(x + (y * x), macro_chunk_entity);
                 tile_storage.set(&tile_pos, macro_chunk_entity);
             }
         }
 
-        let grid_size =  TilemapGridSize { x: chunking_config.macro_chunk_size as f32, y: chunking_config.macro_chunk_size as f32} ;
+        let tile_size =  TilemapTileSize { x: (chunking_config.macro_chunk_size) as f32, y: (chunking_config.macro_chunk_size) as f32} ;
+        let grid_size =  tile_size.into();
         let map_type =  TilemapType::Square;
 
         let world_map_entity = commands.entity(world_chunks_entity).insert(WorldTileMap {
@@ -235,7 +200,7 @@ impl WorldChunks {
             texture: world_textures.get_texture("aggregate"),
             world_textures,
             storage: tile_storage,
-            tile_size: TilemapTileSize { x: chunking_config.macro_chunk_size as f32, y: chunking_config.macro_chunk_size as f32 },
+            tile_size,
             transform: get_tilemap_center_transform(&map_size, &grid_size, &map_type, 0.0),
             frustum_culling: Default::default(),
             global_transform: Default::default(),
@@ -262,7 +227,25 @@ fn generate_world_chunks(
     mut commands: Commands,
     mut images: ResMut<Assets<Image>>
 ) {
-    
+    let x = 1;
+    WorldChunks::new(commands, images,
+                     NoiseStrategies {
+                         continentalness_strategy: ContinentalnessStrategy::new(42),
+                         temperature_strategy: TemperatureStrategy::new(42),
+                         altitude_strategy: AltitudeStrategy::new(42)
+                     },
+                     TilingStrategy::new(
+                         TilingConfig{
+                             sea_level: 0.1,
+                             river_threshold: 0.1,
+                         }
+                    ), 
+                    ChunkingConfig {
+                        macro_chunk_size: 32,
+                        meso_chunk_size: 32,
+                        map_width: 1024,
+                        map_height: 512,
+                    });
 }
 
 

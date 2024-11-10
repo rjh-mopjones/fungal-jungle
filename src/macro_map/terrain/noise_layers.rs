@@ -18,6 +18,17 @@ pub struct NoiseLayers {
 }
 
 impl NoiseLayers {
+    pub(crate) fn new(size: usize) -> Self {
+        Self {
+            aggregate: DynamicImage::new_rgb8(size as u32, size as u32),
+            continentalness: DynamicImage::new_rgb8(size as u32, size as u32),
+            temperature: DynamicImage::new_rgb8(size as u32, size as u32),
+            altitude: DynamicImage::new_rgb8(size as u32, size as u32),
+        }
+    }
+}
+
+impl NoiseLayers {
     pub(crate) fn add_at_index(&mut self, x: usize, y: usize, noise_values: &NoiseValues, tiling_strategy: &TilingStrategy) {
         self.aggregate.put_pixel(x as u32, y as u32, tiling_strategy.get_tile(noise_values).rbg_colour().to_rgba());
         self.continentalness.put_pixel(x as u32, y as u32, tiling_strategy.get_grayscale_tile(noise_values.continentalness).to_rgba());

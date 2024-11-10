@@ -105,6 +105,7 @@ fn switch_layer(
 pub(super) fn plugin(app: &mut App) {
     app.add_plugins(TilemapPlugin)
        .add_plugins(crate::macro_map::macromap::plugin)
+       // .add_plugins(crate::macro_map::terrain::terrain_chunks::plugin)
        .init_resource::<CursorPos>()
        .add_systems(Update, update_cursor_pos)
        .add_systems(Update, highlight_tile)
