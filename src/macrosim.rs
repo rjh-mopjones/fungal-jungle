@@ -1,15 +1,17 @@
-use bevy::app::{App, Update};
+use bevy::app::{App, Plugin, Update};
 use bevy::color::LinearRgba;
 use bevy::color::palettes::basic::WHITE;
 use bevy::color::palettes::css::WHEAT;
+use bevy::ecs::schedule::IntoSystemConfigs;
 use bevy::input::ButtonInput;
 use bevy::math::{Vec2, Vec4};
-use bevy::prelude::{Camera, Commands, Component, CursorMoved, Entity, EventReader, GlobalTransform, KeyCode, Query, Res, ResMut, Resource, Transform, Vec4Swizzles, With};
+use bevy::prelude::{Camera, Commands, Component, CursorMoved, Entity, EventReader, GlobalTransform, in_state, KeyCode, Query, Res, ResMut, Resource, Transform, Vec4Swizzles, With};
 use bevy::prelude::Color as OtherColor;
 use bevy_ecs_tilemap::map::{TilemapGridSize, TilemapSize, TilemapTexture, TilemapType};
 use bevy_ecs_tilemap::prelude::{TileColor, TilePos, TileStorage};
 use bevy_ecs_tilemap::{TilemapPlugin};
 use crate::macro_map::macromap::{CurrentLayer, MacroLayerTextures};
+use crate::modes::AppMode;
 
 const SPRITE_SHEET_PATH: &str = "sprite-sheet.png";
 const SPRITE_SCALE_FACTOR: usize = 10;
@@ -102,12 +104,21 @@ fn switch_layer(
     }
 }
 
-pub(super) fn plugin(app: &mut App) {
-    app.add_plugins(TilemapPlugin)
-       .add_plugins(crate::macro_map::macromap::plugin)
-       // .add_plugins(crate::macro_map::terrain::terrain_chunks::plugin)
-       .init_resource::<CursorPos>()
-       .add_systems(Update, update_cursor_pos)
-       .add_systems(Update, highlight_tile)
-       .add_systems(Update, switch_layer);
+pub struct MacroSimPlugin {
+    mode: AppMode,
+}
+
+impl Plugin for MacroSimPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins(TilemapPlugin)
+           .add_plugins(crate::macro_map::macromap::MacroMapPlugin { mode: self.mode })
+           .init_resource::<CursorPos>()
+           .add_systems(Update, update_cursor_pos.run_if(in_state(self.mode)))
+           .add_systems(Update, highlight_tile.run_if(in_state(self.mode)))
+           .add_systems(Update, switch_layer.run_if(in_state(self.mode)));
+    }
+}
+
+pub fn plugin_for_mode(mode: AppMode) -> MacroSimPlugin {
+    MacroSimPlugin { mode }
 }

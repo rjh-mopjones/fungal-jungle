@@ -23,6 +23,5 @@ pub(super) fn plugin(app: &mut App) {
         ..default()
     }).set(ImagePlugin::default_nearest()))
     .add_plugins(crate::diagnostics::plugin)
-    .add_plugins(crate::macrosim::plugin)
     .add_plugins(crate::camera::plugin);
 }
